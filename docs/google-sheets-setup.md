@@ -1,34 +1,47 @@
 # Google Sheets Setup
 
-Use these steps to connect the GitHub Pages form to a Google Sheet through
-Google Apps Script.
+Use these steps to connect the GitHub Pages workspace to the Google Sheet through Google Apps Script.
 
-## 1. Create the Sheet
+## 1. Sheet
 
-1. Create a new Google Sheet for Caledon CES RFP partner workspace requests.
-2. Rename the first tab to `Workspace Requests`.
-3. Do not store confidential pricing, final proposal strategy, credentials, or
-   private bid files in this public intake flow.
+Create or confirm the backing Google Sheet:
 
-## 2. Add Apps Script
+- Sheet name: `Caledon CES RFP Partner Submissions`
+- Sheet ID: `1Qu61T41ut8kbRrca7tcfOfmsk0BFjHm-FxeuM6jZP14`
+- Tab name: `Submissions`
 
-1. In the Sheet, open Extensions -> Apps Script.
-2. Replace the default script with `apps-script/Code.gs` from this repository.
-3. Save the project.
+The expected header row is:
 
-The script uses the active spreadsheet and writes submissions to the
-`Workspace Requests` sheet.
+```text
+receivedAt | submissionId | workspaceVersion | reviewerName | reviewerEmail | organization | role | submissionStatus | notes | selectedRole | submittedAt | payloadHash | fullJsonPayload
+```
 
-## 3. Deploy The Web App
+The Apps Script receiver will create or refresh this header row if needed.
 
-1. Select Deploy -> New deployment.
-2. Choose Web app.
-3. Set "Execute as" to the script owner.
+## 2. Apps Script
+
+1. Open the Sheet.
+2. Select **Extensions -> Apps Script**.
+3. Replace the default script with `apps-script/Code.gs` from this repository.
+4. Save the project as `Caledon CES RFP Submission Receiver`.
+
+## 3. Deploy the Web App
+
+1. Select **Deploy -> New deployment**.
+2. Choose **Web app**.
+3. Set **Execute as** to the script owner.
 4. Set access to the intended submission audience.
 5. Deploy and authorize the script.
 6. Copy the `/exec` web app URL.
 
-The current `index.html` is configured with:
+Current deployment:
+
+```text
+Deployment ID: AKfycbymAXZnRnwLNCDCCzfWmUvbTX57_-z2i4GOBOPAAYlbwPupDARLpzCr2uB4VaLyp6ZM
+Web app: https://script.google.com/macros/s/AKfycbymAXZnRnwLNCDCCzfWmUvbTX57_-z2i4GOBOPAAYlbwPupDARLpzCr2uB4VaLyp6ZM/exec
+```
+
+`index.html` must contain:
 
 ```js
 const SUBMISSION_ENDPOINT = "https://script.google.com/macros/s/AKfycbymAXZnRnwLNCDCCzfWmUvbTX57_-z2i4GOBOPAAYlbwPupDARLpzCr2uB4VaLyp6ZM/exec";
@@ -37,6 +50,25 @@ const SUBMISSION_ENDPOINT = "https://script.google.com/macros/s/AKfycbymAXZnRnwL
 ## 4. Smoke Test
 
 1. Open the GitHub Pages site.
-2. Submit a non-confidential test request.
-3. Confirm a new row appears in the Google Sheet.
-4. Delete the test row if it is no longer needed.
+2. Confirm there is no placeholder endpoint warning.
+3. Confirm these workspace features are visible:
+   - Submit to Coordinator
+   - HCE, MIES, and Mantle Climate role lanes
+   - Local save
+   - JSON export/import
+   - Five upload sections
+   - Portal forms
+   - QA checks
+4. Submit one non-confidential HCE test.
+5. Confirm a new row appears in the `Submissions` tab.
+6. Delete the test row if it is no longer needed.
+
+## 5. Public Repo Guardrails
+
+This repository is public. Do not commit:
+
+- confidential final pricing;
+- final proposal strategy;
+- credentials, tokens, or secrets;
+- private bid files;
+- restricted Town, utility, or partner documents.
