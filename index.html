@@ -53,6 +53,7 @@ input,textarea,select{width:100%;border:1px solid #cfd6df;border-radius:10px;pad
 textarea{min-height:92px;resize:vertical} textarea.big{min-height:340px} textarea.medium{min-height:160px}
 .field-card{border:1px solid var(--line);border-radius:16px;background:#fff;padding:14px;margin-bottom:14px}
 .field-card.hce{border-left:6px solid var(--hce)} .field-card.mies{border-left:6px solid var(--mies)} .field-card.mantle{border-left:6px solid var(--mantle)} .field-card.bid{border-left:6px solid var(--bid)} .field-card.shared{border-left:6px solid var(--shared)}
+.reference-card-grid{display:grid;gap:14px}
 .meta{display:flex;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:.82rem;margin:6px 0}
 table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden} th,td{border:1px solid var(--line);padding:8px;vertical-align:top;text-align:left} th{background:#f0f4f8;font-size:.82rem} td input,td textarea,td select{min-width:130px}
 .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px} .tabs button{background:#eef2f7;color:#344054} .tabs button.active{background:#0b4a7a;color:#fff}
@@ -694,30 +695,48 @@ const DEFAULT_DATA = {
       {
         "ref": "Reference 1",
         "partner": "HCE",
-        "project": "HCE Energy Harvesting Feasibility Study",
-        "contact": "[TO BE CONFIRMED]",
-        "value": "[TO BE CONFIRMED]",
-        "dates": "Jan 2023–Dec 2024 [VERIFY]",
+        "companyName": "",
+        "referenceFullName": "[TO BE CONFIRMED]",
+        "referenceRoleTitle": "",
+        "referencePhoneExtension": "",
+        "referenceEmail": "",
+        "projectName": "HCE Energy Harvesting Feasibility Study",
+        "projectAddress": "",
+        "primaryConsultant": "TBC",
+        "projectValue": "[TO BE CONFIRMED]",
+        "projectDates": "Jan 2023–Dec 2024 [VERIFY]",
         "permission": "[TO BE CONFIRMED]",
         "status": "Not ready"
       },
       {
         "ref": "Reference 2",
         "partner": "MIES",
-        "project": "[TO BE CONFIRMED: MIES reference]",
-        "contact": "[TO BE CONFIRMED]",
-        "value": "[TO BE CONFIRMED]",
-        "dates": "[TO BE CONFIRMED]",
+        "companyName": "",
+        "referenceFullName": "[TO BE CONFIRMED]",
+        "referenceRoleTitle": "",
+        "referencePhoneExtension": "",
+        "referenceEmail": "",
+        "projectName": "[TO BE CONFIRMED: MIES reference]",
+        "projectAddress": "",
+        "primaryConsultant": "TBC",
+        "projectValue": "[TO BE CONFIRMED]",
+        "projectDates": "[TO BE CONFIRMED]",
         "permission": "[TO BE CONFIRMED]",
         "status": "Not ready"
       },
       {
         "ref": "Reference 3",
         "partner": "Mantle",
-        "project": "[TO BE CONFIRMED: Mantle reference]",
-        "contact": "[TO BE CONFIRMED]",
-        "value": "[TO BE CONFIRMED]",
-        "dates": "[TO BE CONFIRMED]",
+        "companyName": "",
+        "referenceFullName": "[TO BE CONFIRMED]",
+        "referenceRoleTitle": "",
+        "referencePhoneExtension": "",
+        "referenceEmail": "",
+        "projectName": "[TO BE CONFIRMED: Mantle reference]",
+        "projectAddress": "",
+        "primaryConsultant": "TBC",
+        "projectValue": "[TO BE CONFIRMED]",
+        "projectDates": "[TO BE CONFIRMED]",
         "permission": "[TO BE CONFIRMED]",
         "status": "Not ready"
       }
@@ -1095,12 +1114,62 @@ function resetField(id){ const i=state.partnerFields.findIndex(f=>f.id===id); co
 function markFieldReady(id){ const i=state.partnerFields.findIndex(f=>f.id===id); if(i>=0){ state.partnerFields[i].status='Ready for QA'; saveState(); renderPartners(); renderDashboard(); } }
 function renderForms(){
   const formTabs = Object.keys(state.portalForms).map(k => `<button class="${selectedForm===k?'active':''}" onclick="selectedForm='${k}'; renderForms()">${formTitle(k)}</button>`).join('');
-  document.getElementById('forms').innerHTML = `<div class="panel"><h2>Portal Forms</h2><p class="helptext">These surfaces mirror the portal field packs. Values remain internal until locked for portal entry.</p><div class="tabs">${formTabs}</div>${formTable(selectedForm)}</div>`;
+  const formBody = selectedForm === 'references' ? renderReferencesCards() : formTable(selectedForm);
+  document.getElementById('forms').innerHTML = `<div class="panel"><h2>Portal Forms</h2><p class="helptext">These surfaces mirror the portal field packs. Values remain internal until locked for portal entry.</p><div class="tabs">${formTabs}</div>${formBody}</div>`;
 }
 function formTitle(k){ return ({bidSubmission:'Bid Submission', pricing:'Price Schedule A', hourly:'Hourly Rates', references:'Mandatory References', subcontractors:'Subcontractors', addenda:'Addenda / Upload'})[k] || k; }
 function formTable(k){ const rows = state.portalForms[k]||[]; if(!rows.length) return '<p>No rows.</p>'; const cols = Object.keys(rows[0]); return `<div class="table-wrap"><table><thead><tr>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((r,i)=>`<tr>${cols.map(c=>`<td>${formCell(k,i,c,r[c])}</td>`).join('')}</tr>`).join('')}</tbody></table></div><div class="toolbar"><button class="small secondary" onclick="addFormRow('${k}')">Add row</button><button class="small" onclick="exportPortalSummary()">Export portal summary</button></div>`; }
 function formCell(k,i,c,v){ if(c==='owner') return ownerChips(v); if(typeof v === 'boolean') return `<select data-path="portalForms.${k}.${i}.${c}"><option ${v?'selected':''}>true</option><option ${!v?'selected':''}>false</option></select>`; if(String(v).length>45 || c==='type') return `<textarea data-path="portalForms.${k}.${i}.${c}">${escapeHtml(v)}</textarea>`; return `<input data-path="portalForms.${k}.${i}.${c}" value="${escapeHtml(v)}">`; }
 function addFormRow(k){ const rows=state.portalForms[k]; if(!rows || !rows.length) return; const blank={}; Object.keys(rows[0]).forEach(c=>blank[c]=''); rows.push(blank); saveState(); renderForms(); }
+function ensureReferenceRows(){
+  const defaults = DEFAULT_DATA.portalForms.references;
+  const rows = state.portalForms.references || (state.portalForms.references = []);
+  while(rows.length < 3) rows.push(structuredCloneSafe(defaults[rows.length]));
+  return rows;
+}
+function normalizeReferenceRow(row, index){
+  const fallback = DEFAULT_DATA.portalForms.references[index] || {};
+  const partner = row.partner || fallback.partner || ['HCE','MIES','Mantle'][index] || 'TBC';
+  row.ref = row.ref || `Reference ${index + 1}`;
+  row.partner = partner;
+  row.companyName = row.companyName || '';
+  row.referenceFullName = row.referenceFullName || row.contact || '';
+  row.referenceRoleTitle = row.referenceRoleTitle || '';
+  row.referencePhoneExtension = row.referencePhoneExtension || '';
+  row.referenceEmail = row.referenceEmail || '';
+  row.projectName = row.projectName || row.project || '';
+  row.projectAddress = row.projectAddress || '';
+  row.primaryConsultant = row.primaryConsultant || 'TBC';
+  row.projectValue = row.projectValue || row.value || '';
+  row.projectDates = row.projectDates || row.dates || '';
+  row.permission = row.permission || '';
+  row.status = row.status || 'TBC';
+  return row;
+}
+function renderReferencesCards(){
+  const rows = ensureReferenceRows().map(normalizeReferenceRow);
+  return `<div class="callout warn">These fields are staged to mirror the Town portal reference form. Final values must be verified before portal entry.</div><div class="reference-card-grid">${rows.map(referenceCard).join('')}</div><div class="toolbar"><button class="small" onclick="exportPortalSummary()">Export portal summary</button></div>`;
+}
+function referenceCard(row, index){
+  const label = `${row.ref || `Reference ${index + 1}`} — ${row.partner || 'TBC'}`;
+  return `<div class="field-card reference-card ${itemOwnerClass(row.partner)}"><h3>${escapeHtml(label)}</h3><div class="grid two">
+    ${referenceInput(index,'companyName','Company Name',row.companyName)}
+    ${referenceInput(index,'referenceFullName','Reference Full Name',row.referenceFullName)}
+    ${referenceInput(index,'referenceRoleTitle','Reference Role and Title',row.referenceRoleTitle)}
+    ${referenceInput(index,'referencePhoneExtension','Reference Phone Number and Extension',row.referencePhoneExtension)}
+    ${referenceInput(index,'referenceEmail','Reference Email Address',row.referenceEmail,'email')}
+    ${referenceInput(index,'projectName','Project Name',row.projectName)}
+    ${referenceInput(index,'projectAddress','Project Address',row.projectAddress)}
+    <div><label>Were you the General Contractor / Primary Consultant? YES/NO</label><select data-path="portalForms.references.${index}.primaryConsultant">${selectOptions(['TBC','YES','NO'], row.primaryConsultant)}</select></div>
+    ${referenceInput(index,'projectValue','Project Value',row.projectValue)}
+    ${referenceInput(index,'projectDates','Project Dates',row.projectDates)}
+    ${referenceInput(index,'permission','Permission to Contact / Cite',row.permission)}
+    <div><label>Status</label><select data-path="portalForms.references.${index}.status">${selectOptions(['TBC','Not ready','Drafting','Partner review','Ready for QA','Final'], row.status)}</select></div>
+  </div></div>`;
+}
+function referenceInput(index, field, label, value, type='text'){
+  return `<div><label>${escapeHtml(label)}</label><input type="${type}" data-path="portalForms.references.${index}.${field}" value="${escapeHtml(value)}"></div>`;
+}
 function renderPricing(){
   const subPct = totalSubPct();
   document.getElementById('pricing').innerHTML = `<div class="panel"><h2>Pricing & Workshare Controls</h2><div class="callout warn"><strong>Internal only:</strong> Do not export pricing into Sections 1–5. Use this to reconcile portal pricing, hourly rates, staff hours and subcontractor cap.</div><h3>Price Schedule A</h3>${formTableInline('pricing')}<h3>Hourly Rates</h3>${formTableInline('hourly')}<h3>Mandatory Subcontractors</h3>${formTableInline('subcontractors')}<div class="callout ${subPct>=50?'danger':'ok'}"><strong>Subcontractor percentage check:</strong> Current total = ${subPct.toFixed(1)}%. ${subPct>=50?'At or above 50%; revise before final.':'Below 50% based on entered values.'}</div></div>`;
