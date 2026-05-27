@@ -1,0 +1,43 @@
+name: Status Dropdown Patch
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-status-dropdowns:
+    if: ${{ !contains(github.event.head_commit.message, 'Convert portal status cells to dropdowns') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch status cells only
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text()
+          old = """function formCell(k,i,c,v){ if(c==='owner') return ownerChips(v); if(typeof v === 'boolean') return `<select data-path=\"portalForms.${k}.${i}.${c}\"><option ${v?'selected':''}>true</option><option ${!v?'selected':''}>false</option></select>`; if(String(v).length>45 || c==='type') return `<textarea data-path=\"portalForms.${k}.${i}.${c}\">${escapeHtml(v)}</textarea>`; return `<input data-path=\"portalForms.${k}.${i}.${c}\" value=\"${escapeHtml(v)}\">`; }"""
+          new = """function formCell(k,i,c,v){
+  if(c==='owner') return ownerChips(v);
+  if(c==='status') return `<select data-path=\"portalForms.${k}.${i}.${c}\">${selectOptions(['TBC','Not started','Drafting','Partner review','Ready for QA','Final','Open','Not ready','Confirmed partner; commercial TBC'], v || 'TBC')}</select>`;
+  if(typeof v === 'boolean') return `<select data-path=\"portalForms.${k}.${i}.${c}\"><option ${v?'selected':''}>true</option><option ${!v?'selected':''}>false</option></select>`;
+  if(String(v).length>45 || c==='type') return `<textarea data-path=\"portalForms.${k}.${i}.${c}\">${escapeHtml(v)}</textarea>`;
+  return `<input data-path=\"portalForms.${k}.${i}.${c}\" value=\"${escapeHtml(v)}\">`;
+}"""
+          if old not in s:
+              raise SystemExit('Target formCell function not found; refusing broad edit.')
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && exit 0
+          git commit -m "Convert portal status cells to dropdowns"
+          git push
