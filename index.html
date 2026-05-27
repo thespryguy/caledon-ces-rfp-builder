@@ -54,6 +54,10 @@ textarea{min-height:92px;resize:vertical} textarea.big{min-height:340px} textare
 .field-card{border:1px solid var(--line);border-radius:16px;background:#fff;padding:14px;margin-bottom:14px}
 .field-card.hce{border-left:6px solid var(--hce)} .field-card.mies{border-left:6px solid var(--mies)} .field-card.mantle{border-left:6px solid var(--mantle)} .field-card.bid{border-left:6px solid var(--bid)} .field-card.shared{border-left:6px solid var(--shared)}
 .reference-card-grid{display:grid;gap:14px}
+.pricing-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:12px 0}
+.pricing-summary .kpi{min-height:94px}
+.pricing-build-table td input,.pricing-build-table td select,.pricing-build-table td textarea{min-width:120px}
+.readonly-cell{color:var(--muted);font-size:.9rem;min-width:170px}
 .meta{display:flex;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:.82rem;margin:6px 0}
 table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden} th,td{border:1px solid var(--line);padding:8px;vertical-align:top;text-align:left} th{background:#f0f4f8;font-size:.82rem} td input,td textarea,td select{min-width:130px}
 .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px} .tabs button{background:#eef2f7;color:#344054} .tabs button.active{background:#0b4a7a;color:#fff}
@@ -66,7 +70,7 @@ table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(-
 .submission-banner.ready{background:#e8f7ef;border-color:#9bd4b6;border-left-color:var(--green)}
 .codebox{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#0b1220;color:#e6edf3;border-radius:12px;padding:10px;overflow:auto;white-space:pre-wrap}
 @media(max-width:1100px){.submit-grid{grid-template-columns:1fr}}
-@media(max-width:1100px){.app{grid-template-columns:1fr} nav{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:repeat(2,1fr);gap:6px} .cards,.four,.three,.two{grid-template-columns:1fr} .header-inner{display:block}}
+@media(max-width:1100px){.app{grid-template-columns:1fr} nav{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:repeat(2,1fr);gap:6px} .cards,.four,.three,.two,.pricing-summary{grid-template-columns:1fr} .header-inner{display:block}}
 @media print{header,nav,.toolbar,.role-card button,.no-print{display:none!important} .app{display:block} main{padding:0} .panel{box-shadow:none;border:1px solid #ddd;break-inside:avoid}}
 </style>
 </head>
@@ -792,6 +796,36 @@ const DEFAULT_DATA = {
       }
     ]
   },
+  "pricingBuild": {
+    "taskAllocations": [],
+    "overrides": {
+      "A.1": {
+        "enabled": false,
+        "manualPrice": "",
+        "reason": ""
+      },
+      "A.2": {
+        "enabled": false,
+        "manualPrice": "",
+        "reason": ""
+      },
+      "A.3": {
+        "enabled": false,
+        "manualPrice": "",
+        "reason": ""
+      },
+      "A.4": {
+        "enabled": false,
+        "manualPrice": "",
+        "reason": ""
+      },
+      "A.5": {
+        "enabled": false,
+        "manualPrice": "",
+        "reason": ""
+      }
+    }
+  },
   "unassignedRisks": [
     {
       "id": "GIS-01",
@@ -984,6 +1018,7 @@ function buildSubmissionPayload(){
     laneState: lane,
     partnerInputs: scope==='full' ? state.partnerFields : lane.partnerFields,
     portalForms: scope==='full' ? state.portalForms : lane.portalForms,
+    pricingBuild: state.pricingBuild || defaultPricingBuild(),
     pricingWorkshareInputs: { subcontractorPercentTotal: totalSubPct(), pricingRows: state.portalForms.pricing, subcontractorRows: state.portalForms.subcontractors },
     qaResults: scanAll(),
     fullState: scope==='full' ? state : null,
@@ -1172,10 +1207,175 @@ function referenceInput(index, field, label, value, type='text'){
 }
 function renderPricing(){
   const subPct = totalSubPct();
-  document.getElementById('pricing').innerHTML = `<div class="panel"><h2>Pricing & Workshare Controls</h2><div class="callout warn"><strong>Internal only:</strong> Do not export pricing into Sections 1–5. Use this to reconcile portal pricing, hourly rates, staff hours and subcontractor cap.</div><h3>Price Schedule A</h3>${formTableInline('pricing')}<h3>Hourly Rates</h3>${formTableInline('hourly')}<h3>Mandatory Subcontractors</h3>${formTableInline('subcontractors')}<div class="callout ${subPct>=50?'danger':'ok'}"><strong>Subcontractor percentage check:</strong> Current total = ${subPct.toFixed(1)}%. ${subPct>=50?'At or above 50%; revise before final.':'Below 50% based on entered values.'}</div></div>`;
+  document.getElementById('pricing').innerHTML = `<div class="panel"><h2>Pricing & Workshare Controls</h2><div class="callout warn"><strong>Internal only:</strong> Do not export pricing into Sections 1–5. Use this to reconcile portal pricing, hourly rates, staff hours and subcontractor cap.</div>${renderTaskHoursBuild()}<h3>Price Schedule A</h3>${formTableInline('pricing')}<h3>Hourly Rates</h3>${formTableInline('hourly')}<h3>Mandatory Subcontractors</h3>${formTableInline('subcontractors')}<div class="callout ${subPct>=50?'danger':'ok'}"><strong>Subcontractor percentage check:</strong> Current total = ${subPct.toFixed(1)}%. ${subPct>=50?'At or above 50%; revise before final.':'Below 50% based on entered values.'}</div></div>`;
 }
 function formTableInline(k){ const rows=state.portalForms[k]||[]; if(!rows.length) return '<p>No rows.</p>'; const cols=Object.keys(rows[0]); return `<table><thead><tr>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((r,i)=>`<tr>${cols.map(c=>`<td>${formCell(k,i,c,r[c])}</td>`).join('')}</tr>`).join('')}</tbody></table>`; }
 function totalSubPct(){ return (state.portalForms.subcontractors||[]).reduce((sum,r)=>sum+(parseFloat(String(r.pct||'').replace('%',''))||0),0); }
+function defaultPricingBuild(){ return structuredCloneSafe(DEFAULT_DATA.pricingBuild); }
+function ensurePricingBuild(){
+  const d = defaultPricingBuild();
+  const build = state.pricingBuild || (state.pricingBuild = d);
+  if(!Array.isArray(build.taskAllocations)) build.taskAllocations = [];
+  if(!build.overrides || typeof build.overrides !== 'object') build.overrides = {};
+  (state.portalForms.pricing||[]).forEach(t => {
+    const line = t.line;
+    if(line && !build.overrides[line]) build.overrides[line] = structuredCloneSafe(d.overrides[line] || {enabled:false,manualPrice:'',reason:''});
+  });
+  build.taskAllocations.forEach((a,i) => {
+    a.id = a.id || `alloc-${Date.now()}-${i}`;
+    a.taskLine = a.taskLine || (state.portalForms.pricing?.[0]?.line || 'A.1');
+    a.partner = a.partner || 'HCE';
+    a.teamMemberId = a.teamMemberId || '';
+    a.teamMemberName = a.teamMemberName || '';
+    a.role = a.role || '';
+    a.rate = a.rate || '';
+    a.hours = a.hours || '';
+    a.status = a.status || 'TBC';
+    a.notes = a.notes || '';
+  });
+  return build;
+}
+function hourlyPeopleOptions(){
+  return (state.portalForms.hourly||[]).map((p,i) => ({
+    id: `hourly-${i}`,
+    index: i,
+    partner: p.partner || '',
+    name: p.name || '',
+    role: p.role || '',
+    rate: p.rate || '',
+    label: `${p.partner || 'Partner TBC'} — ${p.name || '[TO BE CONFIRMED]'} — ${p.role || 'Role TBC'} — ${p.rate || 'rate TBC'}`
+  }));
+}
+function getHourlyPersonById(id){ return hourlyPeopleOptions().find(p => p.id === id); }
+function taskByLine(line){ return (state.portalForms.pricing||[]).find(t => t.line === line) || {line, task:'Task TBC', lead:'', price:'', status:'TBC'}; }
+function numericMoney(value){
+  const cleaned = String(value ?? '').replace(/,/g,'').replace(/[^0-9.-]/g,'');
+  const n = parseFloat(cleaned);
+  return Number.isFinite(n) ? n : 0;
+}
+function hasNumericValue(value){ return String(value ?? '').trim() !== '' && Number.isFinite(parseFloat(String(value).replace(/,/g,'').replace(/[^0-9.-]/g,''))); }
+function money(n){ return '$' + (Number.isFinite(n) ? n : 0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function pct(n){ return (Number.isFinite(n) ? n : 0).toFixed(1) + '%'; }
+function pricingAllocationTotal(allocation){ return numericMoney(allocation.rate) * numericMoney(allocation.hours); }
+function calculatedTaskTotals(){
+  const totals = {};
+  (state.portalForms.pricing||[]).forEach(t => totals[t.line] = 0);
+  ensurePricingBuild().taskAllocations.forEach(a => { totals[a.taskLine] = (totals[a.taskLine] || 0) + pricingAllocationTotal(a); });
+  return totals;
+}
+function displayedTaskPrice(line){
+  const totals = calculatedTaskTotals();
+  const override = ensurePricingBuild().overrides[line] || {};
+  return override.enabled ? numericMoney(override.manualPrice) : (totals[line] || 0);
+}
+function partnerTotals(){
+  const totals = {HCE:0,MIES:0,Mantle:0,Other:0};
+  ensurePricingBuild().taskAllocations.forEach(a => {
+    const key = ['HCE','MIES','Mantle'].includes(a.partner) ? a.partner : 'Other';
+    totals[key] += pricingAllocationTotal(a);
+  });
+  return totals;
+}
+function workshareSummary(){
+  const partner = partnerTotals();
+  const total = (state.portalForms.pricing||[]).reduce((sum,t)=>sum+displayedTaskPrice(t.line),0);
+  const subcontractor = partner.MIES + partner.Mantle + partner.Other;
+  return {partner,total,subcontractor,hceShare:total?partner.HCE/total*100:0,subShare:total?subcontractor/total*100:0};
+}
+function pricingWarnings(){
+  const build = ensurePricingBuild();
+  const summary = workshareSummary();
+  const warnings = [];
+  const missing = build.taskAllocations.filter(a => !hasNumericValue(a.rate) || !hasNumericValue(a.hours));
+  if(missing.length) warnings.push(`${missing.length} allocation row(s) have missing or non-numeric rates/hours and calculate as $0 until completed.`);
+  if(summary.total > 0 && summary.subShare >= 50) warnings.push(`Subcontractor share is ${pct(summary.subShare)}, at or above the 50% cap.`);
+  if(summary.total > 0 && summary.hceShare < 51) warnings.push(`HCE share is ${pct(summary.hceShare)}, below the 51% prime-control target.`);
+  Object.entries(build.overrides).forEach(([line,o]) => { if(o.enabled && !String(o.reason||'').trim()) warnings.push(`${line} override is enabled without an override reason.`); });
+  return warnings;
+}
+function renderTaskHoursBuild(){
+  ensurePricingBuild();
+  return `<h3>Task Hours / Price Build</h3><div class="callout"><strong>Non-destructive calculator:</strong> calculated prices are shown here only and do not overwrite Price Schedule A portal values.</div><div class="toolbar"><button class="small" onclick="addPricingAllocation()">Add Allocation Row</button></div>${renderAllocationTable()}${renderTaskRollup()}${renderWorkshareSummary()}`;
+}
+function renderAllocationTable(){
+  const rows = ensurePricingBuild().taskAllocations;
+  if(!rows.length) return '<p class="muted">No allocation rows yet. Add a row to build task prices from team member rates and proposed hours.</p>';
+  return `<div class="table-wrap"><table class="pricing-build-table"><thead><tr><th>Task line</th><th>Task name</th><th>Partner</th><th>Team member</th><th>Role</th><th>Rate</th><th>Hours</th><th>Line total</th><th>Status</th><th>Notes</th><th></th></tr></thead><tbody>${rows.map(renderAllocationRow).join('')}</tbody></table></div>`;
+}
+function renderAllocationRow(a,index){
+  const task = taskByLine(a.taskLine);
+  const people = hourlyPeopleOptions();
+  return `<tr><td><select onchange="setPricingAllocation('${a.id}','taskLine',this.value)">${(state.portalForms.pricing||[]).map(t=>`<option value="${escapeHtml(t.line)}" ${a.taskLine===t.line?'selected':''}>${escapeHtml(t.line)}</option>`).join('')}</select></td>
+    <td class="readonly-cell">${escapeHtml(task.task)}</td>
+    <td><select onchange="setPricingAllocation('${a.id}','partner',this.value)">${selectOptions(['HCE','MIES','Mantle','Other/GIS'],a.partner)}</select></td>
+    <td><select onchange="updateAllocationFromPerson('${a.id}',this.value)"><option value="">Select team member</option>${people.map(p=>`<option value="${p.id}" ${a.teamMemberId===p.id?'selected':''}>${escapeHtml(p.label)}</option>`).join('')}</select></td>
+    <td class="readonly-cell">${escapeHtml(a.role || 'Role TBC')}</td>
+    <td><input value="${escapeHtml(a.rate)}" oninput="setPricingAllocationValue('${a.id}','rate',this.value)" onchange="schedulePricingRender()" placeholder="rate"></td>
+    <td><input value="${escapeHtml(a.hours)}" oninput="setPricingAllocationValue('${a.id}','hours',this.value)" onchange="schedulePricingRender()" placeholder="hours"></td>
+    <td><strong>${money(pricingAllocationTotal(a))}</strong></td>
+    <td><select onchange="setPricingAllocation('${a.id}','status',this.value)">${selectOptions(['TBC','Drafting','Partner review','Ready for QA','Final'],a.status)}</select></td>
+    <td><textarea oninput="setPricingAllocationValue('${a.id}','notes',this.value)" placeholder="Notes">${escapeHtml(a.notes)}</textarea></td>
+    <td><button class="small red" onclick="deletePricingAllocation('${a.id}')">Delete</button></td></tr>`;
+}
+function renderTaskRollup(){
+  const totals = calculatedTaskTotals();
+  return `<h3>Calculated Task Roll-Up</h3><div class="table-wrap"><table class="pricing-rollup-table"><thead><tr><th>Task line</th><th>Task name</th><th>Manual portal price</th><th>Calculated price</th><th>Override?</th><th>Override price</th><th>Override reason</th><th>Displayed price used for totals</th></tr></thead><tbody>${(state.portalForms.pricing||[]).map(t=>{
+    const o = ensurePricingBuild().overrides[t.line] || {enabled:false,manualPrice:'',reason:''};
+    return `<tr><td>${escapeHtml(t.line)}</td><td>${escapeHtml(t.task)}</td><td>${escapeHtml(t.price || 'TBC')}</td><td>${money(totals[t.line]||0)}</td><td><input type="checkbox" ${o.enabled?'checked':''} onchange="setPricingOverride('${t.line}','enabled',this.checked)" style="width:auto"></td><td><input value="${escapeHtml(o.manualPrice || '')}" oninput="setPricingOverrideValue('${t.line}','manualPrice',this.value)" onchange="schedulePricingRender()" placeholder="override price"></td><td><input value="${escapeHtml(o.reason || '')}" oninput="setPricingOverrideValue('${t.line}','reason',this.value)" onchange="schedulePricingRender()" placeholder="required when override is on"></td><td><strong>${money(displayedTaskPrice(t.line))}</strong>${o.enabled?'<br><span class="warnText">Override enabled</span>':''}</td></tr>`;
+  }).join('')}</tbody></table></div>`;
+}
+function renderWorkshareSummary(){
+  const s = workshareSummary();
+  const warnings = pricingWarnings();
+  return `<h3>Pricing Summary / Workshare</h3><div class="pricing-summary">
+    <div class="kpi"><span>Total calculated proposal price</span><strong>${money(s.total)}</strong></div>
+    <div class="kpi"><span>HCE total / share</span><strong>${money(s.partner.HCE)}</strong><span>${pct(s.hceShare)}</span></div>
+    <div class="kpi"><span>Subcontractor total / share</span><strong>${money(s.subcontractor)}</strong><span>${pct(s.subShare)}</span></div>
+    <div class="kpi"><span>MIES total / share</span><strong>${money(s.partner.MIES)}</strong><span>${pct(s.total?s.partner.MIES/s.total*100:0)}</span></div>
+    <div class="kpi"><span>Mantle total / share</span><strong>${money(s.partner.Mantle)}</strong><span>${pct(s.total?s.partner.Mantle/s.total*100:0)}</span></div>
+    <div class="kpi"><span>Other/GIS total / share</span><strong>${money(s.partner.Other)}</strong><span>${pct(s.total?s.partner.Other/s.total*100:0)}</span></div>
+  </div>${warnings.length ? warnings.map(w=>`<div class="callout warn">${escapeHtml(w)}</div>`).join('') : '<div class="callout ok">No pricing-build warnings based on current allocation rows.</div>'}`;
+}
+function schedulePricingRender(){ setTimeout(renderPricing, 0); }
+function setPricingAllocation(id,field,value){
+  const a = ensurePricingBuild().taskAllocations.find(x=>x.id===id);
+  if(a){ a[field] = value; saveState(); schedulePricingRender(); }
+}
+function setPricingAllocationValue(id,field,value){
+  const a = ensurePricingBuild().taskAllocations.find(x=>x.id===id);
+  if(a){ a[field] = value; saveState(); }
+}
+function setPricingOverride(line,field,value){
+  const build = ensurePricingBuild();
+  build.overrides[line] = build.overrides[line] || {enabled:false,manualPrice:'',reason:''};
+  build.overrides[line][field] = value;
+  saveState(); schedulePricingRender();
+}
+function setPricingOverrideValue(line,field,value){
+  const build = ensurePricingBuild();
+  build.overrides[line] = build.overrides[line] || {enabled:false,manualPrice:'',reason:''};
+  build.overrides[line][field] = value;
+  saveState();
+}
+function addPricingAllocation(){
+  const firstTask = state.portalForms.pricing?.[0]?.line || 'A.1';
+  ensurePricingBuild().taskAllocations.push({id:`alloc-${Date.now()}`,taskLine:firstTask,partner:'HCE',teamMemberId:'',teamMemberName:'',role:'',rate:'',hours:'',status:'TBC',notes:''});
+  saveState(); renderPricing();
+}
+function deletePricingAllocation(id){
+  const build = ensurePricingBuild();
+  build.taskAllocations = build.taskAllocations.filter(a=>a.id!==id);
+  saveState(); renderPricing();
+}
+function updateAllocationFromPerson(id, personId){
+  const a = ensurePricingBuild().taskAllocations.find(x=>x.id===id);
+  const p = getHourlyPersonById(personId);
+  if(a){
+    a.teamMemberId = personId;
+    if(p){ a.partner = p.partner; a.teamMemberName = p.name; a.role = p.role; a.rate = p.rate; }
+    saveState(); schedulePricingRender();
+  }
+}
 function renderQA(){
   const scan = scanAll();
   const roleList = state.confirmedPartners.join(', ');
