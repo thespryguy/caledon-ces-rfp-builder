@@ -105,17 +105,11 @@ table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(-
 </main>
 </div>
 <script>
-// ─────────────────────────────────────────────────────────────────────────────
-// Coordinator submission configuration
-// 1) Deploy the Google Apps Script web app from Google_Apps_Script_Code.gs.
-// 2) Paste the web app URL below.
-// 3) Set SUBMISSION_ENABLED to true after setup.
-// 4) Optionally set SUBMISSION_SECRET to match the Apps Script value.
-// ─────────────────────────────────────────────────────────────────────────────
+// Coordinator submission configuration.
 const WORKSPACE_VERSION = "v0.3-google-submit";
 const SUBMISSION_ENDPOINT = "https://script.google.com/macros/s/AKfycbymAXZnRnwLNCDCCzfWmUvbTX57_-z2i4GOBOPAAYlbwPupDARLpzCr2uB4VaLyp6ZM/exec";
 const SUBMISSION_ENABLED = true;
-const SUBMISSION_SECRET = ""; // Lightweight shared secret only; not a security boundary.
+const SUBMISSION_SHARED_KEY = ""; // Optional lightweight shared key.
 
 const DEFAULT_DATA = {
   "version": WORKSPACE_VERSION,
@@ -126,7 +120,7 @@ const DEFAULT_DATA = {
     "reviewerName": "",
     "reviewerEmail": "",
     "organization": "",
-    "role": "",
+    "role": "HCE",
     "submissionStatus": "Draft",
     "notes": "",
     "payloadScope": "lane",
@@ -137,1037 +131,113 @@ const DEFAULT_DATA = {
     "lastSubmissionId": "",
     "lastSubmissionMessage": ""
   },
-  "confirmedPartners": [
-    "HCE",
-    "MIES",
-    "Mantle"
-  ],
+  "confirmedPartners": ["HCE", "MIES", "Mantle"],
   "roles": {
-    "hce": {
-      "label": "HCE",
-      "subtitle": "Prime / Governance / Energy Implementation",
-      "color": "hce",
-      "icon": "🏛️"
-    },
-    "mies": {
-      "label": "MIES",
-      "subtitle": "Modelling / Data / Thermal-Electric Analysis",
-      "color": "mies",
-      "icon": "📊"
-    },
-    "mantle": {
-      "label": "Mantle Climate",
-      "subtitle": "CES Solutions / Scenarios / Climate Policy",
-      "color": "mantle",
-      "icon": "🌐"
-    },
-    "bid": {
-      "label": "Bid / Commercial / Compliance",
-      "subtitle": "Portal forms / Pricing / QA / Upload readiness",
-      "color": "bid",
-      "icon": "✅"
-    },
-    "all": {
-      "label": "Show All",
-      "subtitle": "Full workspace and compiler",
-      "color": "shared",
-      "icon": "🧭"
-    }
+    "hce": {"label":"HCE","subtitle":"Prime / Governance / Energy Implementation","color":"hce","icon":"🏛️"},
+    "mies": {"label":"MIES","subtitle":"Modelling / Data / Thermal-Electric Analysis","color":"mies","icon":"📊"},
+    "mantle": {"label":"Mantle Climate","subtitle":"CES Solutions / Scenarios / Climate Policy","color":"mantle","icon":"🌐"},
+    "bid": {"label":"Bid / Commercial / Compliance","subtitle":"Portal forms / Pricing / QA / Upload readiness","color":"bid","icon":"✅"},
+    "all": {"label":"Show All","subtitle":"Full workspace and compiler","color":"shared","icon":"🧭"}
   },
   "criticalBlockers": [
-    {
-      "id": "BID-01",
-      "owner": [
-        "HCE",
-        "Bid/Compliance"
-      ],
-      "item": "Final legal proponent name, authority-to-bind contact, HST number and conflict declaration are not confirmed.",
-      "status": "Critical before final"
-    },
-    {
-      "id": "REF-01",
-      "owner": [
-        "HCE",
-        "MIES",
-        "Mantle"
-      ],
-      "item": "Three mandatory references are incomplete. HCE Energy Harvesting reference is pre-populated as a candidate, subject to HCE approval.",
-      "status": "Critical before final"
-    },
-    {
-      "id": "COM-01",
-      "owner": [
-        "HCE",
-        "MIES",
-        "Mantle",
-        "Bid/Compliance"
-      ],
-      "item": "Mantle and MIES pricing, hourly rates, workshare and subcontractor percentages are missing.",
-      "status": "Critical before final"
-    },
-    {
-      "id": "SCH-01",
-      "owner": [
-        "HCE",
-        "MIES",
-        "Mantle"
-      ],
-      "item": "Partner staff hours and schedule assumptions are missing for the Section 5 time-task matrix.",
-      "status": "Critical before final"
-    },
-    {
-      "id": "GIS-01",
-      "owner": [
-        "HCE"
-      ],
-      "item": "GIS/platform owner and update workflow remain unresolved and should be treated as an HCE-owned placeholder, not a confirmed partner lane.",
-      "status": "Open risk"
-    },
-    {
-      "id": "QA-01",
-      "owner": [
-        "Bid/Compliance"
-      ],
-      "item": "Addenda, deadline and live portal fields must be reconfirmed before final upload.",
-      "status": "Critical before final"
-    }
+    {"id":"BID-01","owner":["HCE","Bid/Compliance"],"item":"Final legal proponent name, authority-to-bind contact, HST number and conflict declaration are not confirmed.","status":"Critical before final"},
+    {"id":"REF-01","owner":["HCE","MIES","Mantle"],"item":"Three mandatory references are incomplete. HCE Energy Harvesting reference is pre-populated as a candidate, subject to HCE approval.","status":"Critical before final"},
+    {"id":"COM-01","owner":["HCE","MIES","Mantle","Bid/Compliance"],"item":"Mantle and MIES pricing, hourly rates, workshare and subcontractor percentages are missing.","status":"Critical before final"},
+    {"id":"SCH-01","owner":["HCE","MIES","Mantle"],"item":"Partner staff hours and schedule assumptions are missing for the Section 5 time-task matrix.","status":"Critical before final"},
+    {"id":"GIS-01","owner":["HCE"],"item":"GIS/platform owner and update workflow remain unresolved and should be treated as an HCE-owned placeholder, not a confirmed partner lane.","status":"Open risk"},
+    {"id":"QA-01","owner":["Bid/Compliance"],"item":"Addenda, deadline and live portal fields must be reconfirmed before final upload.","status":"Critical before final"}
   ],
   "sections": {
-    "s1": {
-      "title": "Section 1 — Company Profile",
-      "filename": "01_Company_Profile_HCE_Caledon_CES",
-      "owners": [
-        "HCE",
-        "Shared"
-      ],
-      "status": "Drafting",
-      "source": "Pre-filled from v0.3/vNext draft + HCE Energy Harvesting Study + HCE Corporate Responsibility Report",
-      "purpose": "Demonstrate HCE’s credibility as prime consultant, municipal operator, energy implementation partner and final integrator.",
-      "evidence": "Municipal roots; integrated energy and telecommunications experience; district energy / waste heat recovery proof; public-sector infrastructure discipline; sustainability and governance commitments.",
-      "responsibilities": "HCE will lead project governance, quality control, utility coordination support, final integration, implementation pathway development and municipal operator review.",
-      "support": "The Caledon CES Study needs practical recommendations that can move into governance, financing, ownership and future implementation pathways, not a theoretical study only.",
-      "include": "HCE overview; municipal operator lens; HCE Energy Harvesting evidence; project governance; quality management; accessibility/compliance awareness; partner integration role.",
-      "exclude": "Pricing; hourly rates; internal dashboards; action-ID tables; unconfirmed partner claims; references to unconfirmed project partners as confirmed delivery entities.",
-      "body": "[PROPOSAL-FACING DRAFT]\n\nHCE is proposed as the prime consultant and final integration lead for the Caledon Community Energy Systems Study. HCE brings a municipally rooted infrastructure and energy perspective, combining public-sector operating discipline with practical experience in energy systems, telecommunications, stakeholder coordination and implementation planning.\n\nFor this assignment, HCE’s value is not limited to analysis. HCE brings the perspective of a municipal implementation partner that understands how technical recommendations must be translated into ownership models, operating responsibilities, funding pathways, customer adoption strategies, utility coordination and phased delivery plans.\n\nHCE’s direct energy evidence is anchored by the 2025 Hamilton Energy Harvesting Feasibility Study. The study was led by HCE from January 2023 through December 2024 and examined the viability of harvesting waste heat from Hamilton’s Bayfront Industrial Area as a fuel source for an expanded low-carbon district energy system serving downtown Hamilton and beyond. The study advanced a five-phase corridor district energy concept with estimated annual heating demand of 143,000 MWh, peak demand of 51 MW, annual GHG reductions of more than 27,000 tonnes, and an approximately 80% reduction versus business-as-usual fossil fuel heating.\n\n[HCE | REQUIRED BEFORE FINAL: confirm permission to use the Energy Harvesting Study as formal reference/evidence and approve exact wording.]\n\nHCE will coordinate specialist partners, manage project controls, integrate deliverables, and ensure that the final study is practical for Town staff, utilities, developers, major energy users and decision-makers.",
-      "tables": "HCE role/value table; HCE Energy Harvesting evidence table; governance and quality control table.",
-      "gaps": "Legal proponent name; authorized signatory; HCE approval of Energy Harvesting reference language; final HCE team names and resumes."
-    },
-    "s2": {
-      "title": "Section 2 — References / Comparable Projects",
-      "filename": "02_References_Comparable_Projects_HCE_Caledon_CES",
-      "owners": [
-        "HCE",
-        "MIES",
-        "Mantle",
-        "Shared"
-      ],
-      "status": "Drafting",
-      "source": "Pre-filled from vNext draft + HCE Energy Harvesting Study + partner reference placeholders",
-      "purpose": "Explain why the selected references demonstrate relevant capability for Caledon’s CES Study.",
-      "evidence": "HCE Energy Harvesting Study candidate reference; MIES reference placeholder; Mantle reference placeholder; reference readiness checklist.",
-      "responsibilities": "HCE will confirm formal reference permissions and coordinate partner reference inputs. MIES and Mantle must confirm whether they will provide references.",
-      "support": "The Town requires three mandatory references in the portal. This upload should explain relevance while the portal form captures required reference fields.",
-      "include": "Reference relevance narrative; project outcomes; lessons learned; alignment to CES, district energy, energy mapping, low-carbon planning and implementation readiness.",
-      "exclude": "Unsupported candidate references; incomplete contact data in proposal-facing text; unapproved project values; pricing; internal notes.",
-      "body": "[PROPOSAL-FACING DRAFT]\n\nThe reference projects will be selected to demonstrate the capabilities required for Caledon’s Community Energy Systems Study: municipal energy implementation, district energy and waste heat recovery, technical and commercial feasibility, GIS-enabled demand/source mapping, stakeholder coordination, and implementation planning.\n\nProposed Reference 1 — HCE Energy Harvesting Feasibility Study [TO BE CONFIRMED]\nThe 2025 Hamilton Energy Harvesting Feasibility Study is proposed as HCE’s primary energy and district energy reference, subject to HCE approval and reference contact confirmation. The study examined the feasibility of harvesting waste heat from Hamilton’s Bayfront Industrial Area to support an expanded district energy system. It demonstrates HCE’s ability to lead a multi-stakeholder, FCM-supported, implementation-oriented energy study with commercial, technical, governance and funding dimensions.\n\nProposed Reference 2 — MIES reference [TO BE CONFIRMED]\nMIES is requested to provide a reference demonstrating energy modelling, hourly electric/thermal demand analysis, geospatial energy demand analysis, community energy planning, or related municipal/utility-facing work.\n\nProposed Reference 3 — Mantle Climate reference [TO BE CONFIRMED]\nMantle is requested to confirm whether it will provide a reference relevant to climate policy, CES solutions analysis, scenario analysis, climate risk/resilience, FCM/NZT alignment, or grid/energy strategy.\n\n[REQUIRED BEFORE FINAL: Three portal-ready references must be completed with contact details, dates, scope, project value, permission to cite, and relevance to Caledon.]",
-      "tables": "Reference relevance matrix; reference readiness checklist; coverage against RFP assets.",
-      "gaps": "Three final references; contact names; project values; permission to cite; confirmation from MIES and Mantle."
-    },
-    "s3": {
-      "title": "Section 3 — Assigned Project Team",
-      "filename": "03_Assigned_Project_Team_HCE_Caledon_CES",
-      "owners": [
-        "HCE",
-        "MIES",
-        "Mantle",
-        "Bid/Compliance"
-      ],
-      "status": "Drafting",
-      "source": "Pre-filled from vNext draft + Mantle task input + MIES task input",
-      "purpose": "Demonstrate a credible, role-based team with HCE as prime and confirmed specialist roles for MIES and Mantle.",
-      "evidence": "HCE prime role; MIES modelling role; Mantle confirmed solutions/scenario/policy role; placeholders for staff names, resumes, rates and conflict declarations.",
-      "responsibilities": "HCE primes and integrates. MIES leads/supports modelling, data and thermal-electric analysis. Mantle leads Task 3 solutions/scenario analysis and supports policy, FCM/NZT, engagement and governance workstreams.",
-      "support": "The team must prove it can produce the Opportunity Atlas, solutions analysis, stakeholder support and implementation roadmap without overcomplicating delivery.",
-      "include": "Organization chart narrative; role cards; responsibility matrix; backup strategy; partner interfaces; staff/resume placeholders; conflict status placeholders.",
-      "exclude": "Pricing; hourly rates; unconfirmed partners presented as confirmed; internal action dashboards.",
-      "body": "[PROPOSAL-FACING DRAFT]\n\nThe proposed project team is organized around a clear prime-and-specialist model. HCE will serve as prime consultant, municipal implementation lead and final integrator. HCE will manage project governance, partner coordination, utility coordination support, quality assurance and final deliverable integration.\n\nHCE role card\n• Prime consultant and single point of accountability\n• Project governance and quality control\n• Municipal operator lens\n• Utility coordination support\n• District energy / implementation perspective\n• Final integration and QA\n• HCE Energy Harvesting reference/evidence owner\n\nMIES role card\n• Data collection and processing support\n• Natural gas and electricity data requirements\n• Weather, LiDAR, building footprint, archetype and development data assumptions\n• Hourly heat and electricity demand modelling\n• Geospatial heat load and carbon-free heat source mapping support\n• Thermal scenario analysis\n• Support for district energy / thermal network feasibility screening\n\nMantle Climate role card\n• Task 3 lead for solutions overview\n• Electricity demand and solutions analysis\n• CES options matrix\n• Scenario analysis\n• Climate risk and resilience lens\n• FCM/NZT alignment\n• Stakeholder engagement support\n• PESTLE / policy / financing / governance support\n\n[TO BE CONFIRMED: final legal names, staff names, resumes, years of experience, rates, workshare percentages and conflict declarations for all assigned staff and subcontractors.]",
-      "tables": "Role-based team architecture; task responsibility matrix; staff/resume checklist; backup personnel table; subcontractor interface table.",
-      "gaps": "Named staff; resumes; HCE legal entity; Mantle legal entity; MIES legal entity; rates; conflict declarations; final workshare."
-    },
-    "s4": {
-      "title": "Section 4 — Approach and Methodology",
-      "filename": "04_Approach_Methodology_HCE_Caledon_CES",
-      "owners": [
-        "HCE",
-        "MIES",
-        "Mantle",
-        "Shared"
-      ],
-      "status": "Drafting",
-      "source": "Pre-filled from vNext methodology + Mantle tasks + MIES tasks + portal-first strategy",
-      "purpose": "Prove the team can complete every RFP task and produce implementation-ready outputs.",
-      "evidence": "Task-by-task methodology; Opportunity Atlas; data confidence framework; Mantle Task 3 leadership; MIES modelling/thermal support; HCE integration and governance pathway.",
-      "responsibilities": "HCE leads and integrates; MIES supports data, modelling and thermal/electric analysis; Mantle leads CES solutions and scenarios and supports policy/resilience/FCM alignment.",
-      "support": "This section demonstrates how the Town gets decision-grade, updateable, FCM-ready outputs that support implementation rather than another static study.",
-      "include": "Understanding of assignment; methodology roadmap; task/deliverable matrix; data needs; Opportunity Atlas; CES screening; scenario analysis; stakeholder engagement; implementation/governance; QA; FCM/NZT alignment.",
-      "exclude": "Pricing; staff rates; unconfirmed partner claims; detailed engineering claims for every node; internal instructions.",
-      "body": "[PROPOSAL-FACING DRAFT]\n\nOur methodology follows a practical pathway: data governance → demand/source mapping → Opportunity Atlas → solutions screening → scenario analysis → stakeholder validation → governance and financing framework → implementation roadmap.\n\nTask 1 — Methodology and Data Collection\nHCE will lead kickoff, project governance, data request management, assumptions tracking and quality control. MIES will support technical data requirements including monthly natural gas by FSA, hourly electricity data where available, hourly weather data, LiDAR, building footprints, archetypes, development assumptions and major heat source identification. Mantle will participate as a policy lens, reviewing CEERP, Official Plan, municipal energy/GHG data, FCM/NZT commitments, IESO regional infrastructure outlook and Hydro One planning documents.\n\nTask 2 — Geospatial Energy Analysis and Mapping\nThe Caledon Community Energy Opportunity Atlas will integrate growth, building, energy, infrastructure and source-opportunity data into an updateable mapping framework. MIES will support modelling of electric/thermal demand, high-resolution heat profiles, GHG estimates, high-density demand clusters and carbon-free heat source opportunities. Mantle will provide CEERP target context, climate risk hotspot context and FCM/NZT alignment support. [UNASSIGNED / HCE TO CONFIRM: final GIS platform and mapping owner.]\n\nTask 3 — Clean Energy Solutions Analysis\nMantle will lead the solutions overview, including electricity demand and solutions analysis, CES options matrix and scenario analysis. Mantle will evaluate grid constraints and translate infrastructure constraints into opportunities such as rooftop solar on commercial/industrial buildings, community-scale solar, microgrids, large-scale renewables on public lands and energy storage. MIES will lead/support thermal analysis including heating demand, electrification scenarios, thermal networks, waste heat, thermal storage and district energy screening. HCE will integrate findings through an implementation and municipal operator lens.\n\nTask 4 — Stakeholder Engagement Support\nHCE will support Town-led engagement with technical materials, structured feedback capture and implementation-focused discussion. Mantle will attend engagement sessions and Town staff working meetings, bringing climate risk, energy strategy and FCM compliance expertise.\n\nTask 5 — Implementation and Governance Framework\nHCE will lead the implementation roadmap, ownership/governance options, utility coordination logic and final integration. Mantle will support PESTLE, policy framework, municipal planning tools, regulatory barriers/enablers, utility/provincial policy context, financing strategies, municipal models, PPPs, utility partnerships and grants/financing.\n\nThe analysis will be screening-level and decision-support oriented, with priority nodes recommended for future feasibility or pre-feasibility where appropriate.",
-      "tables": "Methodology roadmap; task/deliverable matrix; data confidence framework; Opportunity Atlas layer table; CES options matrix; scenario criteria; FCM/NZT alignment matrix; QA gates.",
-      "gaps": "GIS platform/owner; final modelling methodology; final FCM/NZT terminology; data access assumptions; final partner validation."
-    },
-    "s5": {
-      "title": "Section 5 — Work Schedule",
-      "filename": "05_Work_Schedule_HCE_Caledon_CES",
-      "owners": [
-        "HCE",
-        "MIES",
-        "Mantle",
-        "Bid/Compliance"
-      ],
-      "status": "Drafting",
-      "source": "Pre-filled from vNext schedule structure + RFP milestone alignment",
-      "purpose": "Demonstrate that the team can complete the work on schedule with clear task ownership, staff hours, dependencies and risks.",
-      "evidence": "RFP milestone alignment; Gantt placeholder; time-task matrix placeholders; partner schedule input fields; FCM reporting timing.",
-      "responsibilities": "HCE PM owns schedule. MIES and Mantle must provide task hours, meeting participation, review dependencies and deliverable timing assumptions. Commercial/Bid Manager reconciles staff hours with pricing and workshare.",
-      "support": "A realistic schedule is required to meet Town review points, FCM timing and final report/presentation requirements.",
-      "include": "Weekly Gantt; milestone table; task dependencies; Town review points; meeting cadence; staff-hour matrix; schedule risks and mitigations.",
-      "exclude": "Hourly rates, pricing, partner commercial assumptions, generic timeline without staff hours.",
-      "body": "[PROPOSAL-FACING DRAFT]\n\nThe work schedule will be organized around the Town’s five project tasks and final reporting requirements. HCE will manage schedule control, review points, partner deliverables, risk tracking and final integration.\n\nDraft milestone structure\n• Task 1 — Methodology and Data Collection\n• Task 2 — Geospatial Energy Analysis and Mapping\n• Task 3 — Clean Energy Solutions Analysis\n• Task 4 — Stakeholder Engagement Support\n• Task 5 — Implementation and Governance Framework\n• Draft and final report\n• Final presentation and FCM reporting support\n\nPartner schedule inputs required\n• HCE: project governance, Town meetings, integration, QA, final report, implementation framework.\n• MIES: data review, modelling assumptions, demand/source modelling, thermal/electric analysis, scenario support, review cycles.\n• Mantle: Task 3 solutions/scenario analysis, FCM/NZT alignment, engagement attendance, PESTLE/policy/governance support.\n\n[REQUIRED BEFORE FINAL: complete weekly Gantt chart and time-task matrix with personnel and staff hours. Do not invent staff hours.]",
-      "tables": "RFP milestone alignment; weekly Gantt chart; staff-hour matrix; meeting cadence table; schedule risk/mitigation table.",
-      "gaps": "Partner hours; staff names; task durations; Gantt chart; pricing/staff-hour reconciliation; addenda confirmation."
-    }
+    "s1": {"title":"Section 1 — Company Profile","filename":"01_Company_Profile_HCE_Caledon_CES","owners":["HCE","Shared"],"status":"Drafting","source":"Pre-filled from v0.3/vNext draft + HCE Energy Harvesting Study + HCE Corporate Responsibility Report","purpose":"Demonstrate HCE’s credibility as prime consultant, municipal operator, energy implementation partner and final integrator.","evidence":"Municipal roots; integrated energy and telecommunications experience; district energy / waste heat recovery proof; public-sector infrastructure discipline; sustainability and governance commitments.","responsibilities":"HCE will lead project governance, quality control, utility coordination support, final integration, implementation pathway development and municipal operator review.","support":"The Caledon CES Study needs practical recommendations that can move into governance, financing, ownership and future implementation pathways, not a theoretical study only.","include":"HCE overview; municipal operator lens; HCE Energy Harvesting evidence; project governance; quality management; accessibility/compliance awareness; partner integration role.","exclude":"Pricing; hourly rates; internal dashboards; action-ID tables; unconfirmed partner claims; references to unconfirmed project partners as confirmed delivery entities.","body":"[PROPOSAL-FACING DRAFT]\n\nHCE is proposed as the prime consultant and final integration lead for the Caledon Community Energy Systems Study. HCE brings a municipally rooted infrastructure and energy perspective, combining public-sector operating discipline with practical experience in energy systems, telecommunications, stakeholder coordination and implementation planning.\n\nFor this assignment, HCE’s value is not limited to analysis. HCE brings the perspective of a municipal implementation partner that understands how technical recommendations must be translated into ownership models, operating responsibilities, funding pathways, customer adoption strategies, utility coordination and phased delivery plans.\n\nHCE’s direct energy evidence is anchored by the 2025 Hamilton Energy Harvesting Feasibility Study. The study was led by HCE from January 2023 through December 2024 and examined the viability of harvesting waste heat from Hamilton’s Bayfront Industrial Area as a fuel source for an expanded low-carbon district energy system serving downtown Hamilton and beyond. The study advanced a five-phase corridor district energy concept with estimated annual heating demand of 143,000 MWh, peak demand of 51 MW, annual GHG reductions of more than 27,000 tonnes, and an approximately 80% reduction versus business-as-usual fossil fuel heating.\n\n[HCE | REQUIRED BEFORE FINAL: confirm permission to use the Energy Harvesting Study as formal reference/evidence and approve exact wording.]\n\nHCE will coordinate specialist partners, manage project controls, integrate deliverables, and ensure that the final study is practical for Town staff, utilities, developers, major energy users and decision-makers.","tables":"HCE role/value table; HCE Energy Harvesting evidence table; governance and quality control table.","gaps":"Legal proponent name; authorized signatory; HCE approval of Energy Harvesting reference language; final HCE team names and resumes."},
+    "s2": {"title":"Section 2 — References / Comparable Projects","filename":"02_References_Comparable_Projects_HCE_Caledon_CES","owners":["HCE","MIES","Mantle","Shared"],"status":"Drafting","source":"Pre-filled from vNext draft + HCE Energy Harvesting Study + partner reference placeholders","purpose":"Explain why the selected references demonstrate relevant capability for Caledon’s CES Study.","evidence":"HCE Energy Harvesting Study candidate reference; MIES reference placeholder; Mantle reference placeholder; reference readiness checklist.","responsibilities":"HCE will confirm formal reference permissions and coordinate partner reference inputs. MIES and Mantle must confirm whether they will provide references.","support":"The Town requires three mandatory references in the portal. This upload should explain relevance while the portal form captures required reference fields.","include":"Reference relevance narrative; project outcomes; lessons learned; alignment to CES, district energy, energy mapping, low-carbon planning and implementation readiness.","exclude":"Unsupported candidate references; incomplete contact data in proposal-facing text; unapproved project values; pricing; internal notes.","body":"[PROPOSAL-FACING DRAFT]\n\nThe reference projects will be selected to demonstrate the capabilities required for Caledon’s Community Energy Systems Study: municipal energy implementation, district energy and waste heat recovery, technical and commercial feasibility, GIS-enabled demand/source mapping, stakeholder coordination, and implementation planning.\n\nProposed Reference 1 — HCE Energy Harvesting Feasibility Study [TO BE CONFIRMED]\nThe 2025 Hamilton Energy Harvesting Feasibility Study is proposed as HCE’s primary energy and district energy reference, subject to HCE approval and reference contact confirmation. The study examined the feasibility of harvesting waste heat from Hamilton’s Bayfront Industrial Area to support an expanded district energy system. It demonstrates HCE’s ability to lead a multi-stakeholder, FCM-supported, implementation-oriented energy study with commercial, technical, governance and funding dimensions.\n\nProposed Reference 2 — MIES reference [TO BE CONFIRMED]\nMIES is requested to provide a reference demonstrating energy modelling, hourly electric/thermal demand analysis, geospatial energy demand analysis, community energy planning, or related municipal/utility-facing work.\n\nProposed Reference 3 — Mantle Climate reference [TO BE CONFIRMED]\nMantle is requested to confirm whether it will provide a reference relevant to climate policy, CES solutions analysis, scenario analysis, climate risk/resilience, FCM/NZT alignment, or grid/energy strategy.\n\n[REQUIRED BEFORE FINAL: Three portal-ready references must be completed with contact details, dates, scope, project value, permission to cite, and relevance to Caledon.]","tables":"Reference relevance matrix; reference readiness checklist; coverage against RFP assets.","gaps":"Three final references; contact names; project values; permission to cite; confirmation from MIES and Mantle."},
+    "s3": {"title":"Section 3 — Assigned Project Team","filename":"03_Assigned_Project_Team_HCE_Caledon_CES","owners":["HCE","MIES","Mantle","Bid/Compliance"],"status":"Drafting","source":"Pre-filled from vNext draft + Mantle task input + MIES task input","purpose":"Demonstrate a credible, role-based team with HCE as prime and confirmed specialist roles for MIES and Mantle.","evidence":"HCE prime role; MIES modelling role; Mantle confirmed solutions/scenario/policy role; placeholders for staff names, resumes, rates and conflict declarations.","responsibilities":"HCE primes and integrates. MIES leads/supports modelling, data and thermal-electric analysis. Mantle leads Task 3 solutions/scenario analysis and supports policy, FCM/NZT, engagement and governance workstreams.","support":"The team must prove it can produce the Opportunity Atlas, solutions analysis, stakeholder support and implementation roadmap without overcomplicating delivery.","include":"Organization chart narrative; role cards; responsibility matrix; backup strategy; partner interfaces; staff/resume placeholders; conflict status placeholders.","exclude":"Pricing; hourly rates; unconfirmed partners presented as confirmed; internal action dashboards.","body":"[PROPOSAL-FACING DRAFT]\n\nThe proposed project team is organized around a clear prime-and-specialist model. HCE will serve as prime consultant, municipal implementation lead and final integrator. HCE will manage project governance, partner coordination, utility coordination support, quality assurance and final deliverable integration.\n\nHCE role card\n• Prime consultant and single point of accountability\n• Project governance and quality control\n• Municipal operator lens\n• Utility coordination support\n• District energy / implementation perspective\n• Final integration and QA\n• HCE Energy Harvesting reference/evidence owner\n\nMIES role card\n• Data collection and processing support\n• Natural gas and electricity data requirements\n• Weather, LiDAR, building footprint, archetype and development data assumptions\n• Hourly heat and electricity demand modelling\n• Geospatial heat load and carbon-free heat source mapping support\n• Thermal scenario analysis\n• Support for district energy / thermal network feasibility screening\n\nMantle Climate role card\n• Task 3 lead for solutions overview\n• Electricity demand and solutions analysis\n• CES options matrix\n• Scenario analysis\n• Climate risk and resilience lens\n• FCM/NZT alignment\n• Stakeholder engagement support\n• PESTLE / policy / financing / governance support\n\n[TO BE CONFIRMED: final legal names, staff names, resumes, years of experience, rates, workshare percentages and conflict declarations for all assigned staff and subcontractors.]","tables":"Role-based team architecture; task responsibility matrix; staff/resume checklist; backup personnel table; subcontractor interface table.","gaps":"Named staff; resumes; HCE legal entity; Mantle legal entity; MIES legal entity; rates; conflict declarations; final workshare."},
+    "s4": {"title":"Section 4 — Approach and Methodology","filename":"04_Approach_Methodology_HCE_Caledon_CES","owners":["HCE","MIES","Mantle","Shared"],"status":"Drafting","source":"Pre-filled from vNext methodology + Mantle tasks + MIES tasks + portal-first strategy","purpose":"Prove the team can complete every RFP task and produce implementation-ready outputs.","evidence":"Task-by-task methodology; Opportunity Atlas; data confidence framework; Mantle Task 3 leadership; MIES modelling/thermal support; HCE integration and governance pathway.","responsibilities":"HCE leads and integrates; MIES supports data, modelling and thermal/electric analysis; Mantle leads CES solutions and scenarios and supports policy/resilience/FCM alignment.","support":"This section demonstrates how the Town gets decision-grade, updateable, FCM-ready outputs that support implementation rather than another static study.","include":"Understanding of assignment; methodology roadmap; task/deliverable matrix; data needs; Opportunity Atlas; CES screening; scenario analysis; stakeholder engagement; implementation/governance; QA; FCM/NZT alignment.","exclude":"Pricing; staff rates; unconfirmed partner claims; detailed engineering claims for every node; internal instructions.","body":"[PROPOSAL-FACING DRAFT]\n\nOur methodology follows a practical pathway: data governance → demand/source mapping → Opportunity Atlas → solutions screening → scenario analysis → stakeholder validation → governance and financing framework → implementation roadmap.\n\nTask 1 — Methodology and Data Collection\nHCE will lead kickoff, project governance, data request management, assumptions tracking and quality control. MIES will support technical data requirements including monthly natural gas by FSA, hourly electricity data where available, hourly weather data, LiDAR, building footprints, archetypes, development assumptions and major heat source identification. Mantle will participate as a policy lens, reviewing CEERP, Official Plan, municipal energy/GHG data, FCM/NZT commitments, IESO regional infrastructure outlook and Hydro One planning documents.\n\nTask 2 — Geospatial Energy Analysis and Mapping\nThe Caledon Community Energy Opportunity Atlas will integrate growth, building, energy, infrastructure and source-opportunity data into an updateable mapping framework. MIES will support modelling of electric/thermal demand, high-resolution heat profiles, GHG estimates, high-density demand clusters and carbon-free heat source opportunities. Mantle will provide CEERP target context, climate risk hotspot context and FCM/NZT alignment support. [UNASSIGNED / HCE TO CONFIRM: final GIS platform and mapping owner.]\n\nTask 3 — Clean Energy Solutions Analysis\nMantle will lead the solutions overview, including electricity demand and solutions analysis, CES options matrix and scenario analysis. Mantle will evaluate grid constraints and translate infrastructure constraints into opportunities such as rooftop solar on commercial/industrial buildings, community-scale solar, microgrids, large-scale renewables on public lands and energy storage. MIES will lead/support thermal analysis including heating demand, electrification scenarios, thermal networks, waste heat, thermal storage and district energy screening. HCE will integrate findings through an implementation and municipal operator lens.\n\nTask 4 — Stakeholder Engagement Support\nHCE will support Town-led engagement with technical materials, structured feedback capture and implementation-focused discussion. Mantle will attend engagement sessions and Town staff working meetings, bringing climate risk, energy strategy and FCM compliance expertise.\n\nTask 5 — Implementation and Governance Framework\nHCE will lead the implementation roadmap, ownership/governance options, utility coordination logic and final integration. Mantle will support PESTLE, policy framework, municipal planning tools, regulatory barriers/enablers, utility/provincial policy context, financing strategies, municipal models, PPPs, utility partnerships and grants/financing.\n\nThe analysis will be screening-level and decision-support oriented, with priority nodes recommended for future feasibility or pre-feasibility where appropriate.","tables":"Methodology roadmap; task/deliverable matrix; data confidence framework; Opportunity Atlas layer table; CES options matrix; scenario criteria; FCM/NZT alignment matrix; QA gates.","gaps":"GIS platform/owner; final modelling methodology; final FCM/NZT terminology; data access assumptions; final partner validation."},
+    "s5": {"title":"Section 5 — Work Schedule","filename":"05_Work_Schedule_HCE_Caledon_CES","owners":["HCE","MIES","Mantle","Bid/Compliance"],"status":"Drafting","source":"Pre-filled from vNext schedule structure + RFP milestone alignment","purpose":"Demonstrate that the team can complete the work on schedule with clear task ownership, staff hours, dependencies and risks.","evidence":"RFP milestone alignment; Gantt placeholder; time-task matrix placeholders; partner schedule input fields; FCM reporting timing.","responsibilities":"HCE PM owns schedule. MIES and Mantle must provide task hours, meeting participation, review dependencies and deliverable timing assumptions. Commercial/Bid Manager reconciles staff hours with pricing and workshare.","support":"A realistic schedule is required to meet Town review points, FCM timing and final report/presentation requirements.","include":"Weekly Gantt; milestone table; task dependencies; Town review points; meeting cadence; staff-hour matrix; schedule risks and mitigations.","exclude":"Hourly rates, pricing, partner commercial assumptions, generic timeline without staff hours.","body":"[PROPOSAL-FACING DRAFT]\n\nThe work schedule will be organized around the Town’s five project tasks and final reporting requirements. HCE will manage schedule control, review points, partner deliverables, risk tracking and final integration.\n\nDraft milestone structure\n• Task 1 — Methodology and Data Collection\n• Task 2 — Geospatial Energy Analysis and Mapping\n• Task 3 — Clean Energy Solutions Analysis\n• Task 4 — Stakeholder Engagement Support\n• Task 5 — Implementation and Governance Framework\n• Draft and final report\n• Final presentation and FCM reporting support\n\nPartner schedule inputs required\n• HCE: project governance, Town meetings, integration, QA, final report, implementation framework.\n• MIES: data review, modelling assumptions, demand/source modelling, thermal/electric analysis, scenario support, review cycles.\n• Mantle: Task 3 solutions/scenario analysis, FCM/NZT alignment, engagement attendance, PESTLE/policy/governance support.\n\n[REQUIRED BEFORE FINAL: complete weekly Gantt chart and time-task matrix with personnel and staff hours. Do not invent staff hours.]","tables":"RFP milestone alignment; weekly Gantt chart; staff-hour matrix; meeting cadence table; schedule risk/mitigation table.","gaps":"Partner hours; staff names; task durations; Gantt chart; pricing/staff-hour reconciliation; addenda confirmation."}
   },
-  "partnerFields": [
-    {
-      "id": "hce-legal",
-      "owners": [
-        "HCE",
-        "Bid/Compliance"
-      ],
-      "label": "Legal / submission form inputs",
-      "source": "Portal + HCE corporate records",
-      "status": "Not started",
-      "required": true,
-      "text": "[TO BE CONFIRMED: final legal proponent name, HST number, authority-to-bind contact, submission contact, conflict declaration.]"
-    },
-    {
-      "id": "hce-energy",
-      "owners": [
-        "HCE"
-      ],
-      "label": "HCE Energy Harvesting reference approval",
-      "source": "HCE Energy Harvesting Study",
-      "status": "Drafting",
-      "required": true,
-      "text": "Confirm permission to use Energy Harvesting Study as formal HCE energy/district-energy evidence. Draft evidence: HCE-led study from Jan 2023 to Dec 2024; waste heat from Hamilton Bayfront; five-phase corridor DES; 143,000 MWh/year heating demand; 51 MW peak; >27,000 tonnes/year GHG reduction; approx. 80% reduction vs BAU."
-    },
-    {
-      "id": "hce-team",
-      "owners": [
-        "HCE"
-      ],
-      "label": "HCE team / roles",
-      "source": "HCE drafts",
-      "status": "Not started",
-      "required": true,
-      "text": "[TO BE CONFIRMED: HCE project executive, PM, governance/utility coordination lead, implementation/QA lead, resumes, years of experience, rates.]"
-    },
-    {
-      "id": "hce-roadmap",
-      "owners": [
-        "HCE",
-        "Mantle"
-      ],
-      "label": "Governance and implementation roadmap",
-      "source": "vNext draft + Mantle Task 5",
-      "status": "Drafting",
-      "required": false,
-      "text": "HCE leads implementation roadmap and governance model comparison; Mantle supports PESTLE, policy framework, regulatory barriers/enablers, financing strategies, municipal models, PPPs, utility partnerships and grants/financing."
-    },
-    {
-      "id": "mies-role",
-      "owners": [
-        "MIES"
-      ],
-      "label": "MIES company / role statement",
-      "source": "MIES task input",
-      "status": "Drafting",
-      "required": true,
-      "text": "MIES will support methodology and data collection, geospatial energy demand analysis, high-resolution heating/electricity demand modelling, GHG estimates, carbon-free heat source mapping, thermal scenarios and district energy / thermal network feasibility screening."
-    },
-    {
-      "id": "mies-data",
-      "owners": [
-        "MIES"
-      ],
-      "label": "Data requirements and methodology",
-      "source": "MIES task input",
-      "status": "Drafting",
-      "required": true,
-      "text": "Data requirements include monthly natural gas by FSA, hourly residential/commercial electricity where available, hourly weather data, LiDAR height data, GIS building shapes, building archetypes, development assumptions, future heat sources, data gap/accuracy implications, data cleaning, outlier review and assumptions register."
-    },
-    {
-      "id": "mies-thermal",
-      "owners": [
-        "MIES",
-        "Mantle"
-      ],
-      "label": "Thermal/electric demand modelling and thermal analysis",
-      "source": "MIES task input + Mantle task input",
-      "status": "Drafting",
-      "required": true,
-      "text": "MIES will estimate energy demand by sector, forecast major growth areas, estimate GHGs, generate high-resolution heating demand profiles, identify demand clusters and support thermal network feasibility. Mantle will support thermal suitability, waste heat, wastewater/sewage heat and CHP exploration where appropriate."
-    },
-    {
-      "id": "mies-admin",
-      "owners": [
-        "MIES",
-        "Bid/Compliance"
-      ],
-      "label": "MIES staff, rates, conflict and reference",
-      "source": "Portal requirements",
-      "status": "Not started",
-      "required": true,
-      "text": "[TO BE CONFIRMED: MIES legal entity, project lead, staff names, resumes, years of experience, hourly rates, workshare, conflict declaration, reference availability.]"
-    },
-    {
-      "id": "mantle-role",
-      "owners": [
-        "Mantle"
-      ],
-      "label": "Mantle company / role statement",
-      "source": "Mantle task input",
-      "status": "Drafting",
-      "required": true,
-      "text": "Mantle Climate is confirmed as CES Solutions / Scenario Analysis / Climate Policy and FCM/NZT Alignment partner. Mantle leads Task 3 solutions overview and scenario analysis, and supports Tasks 1, 2, 4 and 5 through climate policy, resilience and funding-alignment lenses."
-    },
-    {
-      "id": "mantle-t1t2",
-      "owners": [
-        "Mantle",
-        "MIES"
-      ],
-      "label": "Mantle Task 1 and Task 2 policy lens",
-      "source": "Mantle task input",
-      "status": "Drafting",
-      "required": true,
-      "text": "Task 1: participate in kickoff and context setting; review CEERP, Official Plan, municipal energy/GHG data, FCM NZT commitments, IESO regional infrastructure outlook and Hydro One planning documents; identify planning gaps and climate policy considerations. Task 2: provide CEERP context, identify climate risk hotspots and support mapping alignment with FCM NZT objectives."
-    },
-    {
-      "id": "mantle-t3",
-      "owners": [
-        "Mantle"
-      ],
-      "label": "Mantle Task 3 lead solutions analysis",
-      "source": "Mantle task input",
-      "status": "Drafting",
-      "required": true,
-      "text": "Mantle will lead electricity demand and solutions analysis, review grid connection priorities/timelines, identify transmission/distribution barriers, translate infrastructure constraints into CES opportunities, develop CES options suited to Caledon, evaluate technology feasibility, scalability, cost/ROI impacts, climate risk/resilience, GHG impacts, FCM NZT alignment, broader grid impacts, and synthesize results into a comparative options matrix."
-    },
-    {
-      "id": "mantle-scenarios",
-      "owners": [
-        "Mantle"
-      ],
-      "label": "Scenario analysis",
-      "source": "Mantle task input",
-      "status": "Drafting",
-      "required": true,
-      "text": "Representative scenarios: business-as-usual based on planned grid infrastructure; moderate CES deployment with targeted DER integration; high CES / integrated system deployment with broader adoption of community-scale energy systems."
-    },
-    {
-      "id": "mantle-t4t5",
-      "owners": [
-        "Mantle",
-        "HCE"
-      ],
-      "label": "Mantle Task 4 and Task 5 support",
-      "source": "Mantle task input",
-      "status": "Drafting",
-      "required": true,
-      "text": "Task 4: Mantle project lead attends engagement sessions and staff working meetings, bringing climate risk, energy strategy and FCM compliance expertise. Task 5: Mantle supports PESTLE, policy framework, municipal planning tools, regulatory barriers/enablers, utility/provincial context, investment and financing strategies, municipal models, PPPs, utility partnerships, grants and financing."
-    },
-    {
-      "id": "mantle-admin",
-      "owners": [
-        "Mantle",
-        "Bid/Compliance"
-      ],
-      "label": "Mantle staff, rates, conflict and reference",
-      "source": "Portal requirements",
-      "status": "Not started",
-      "required": true,
-      "text": "[TO BE CONFIRMED: Mantle legal entity, project lead, resume, years of experience, hourly rates, workshare, conflict declaration, reference availability.]"
-    },
-    {
-      "id": "bid-pricing",
-      "owners": [
-        "Bid/Compliance",
-        "HCE",
-        "MIES",
-        "Mantle"
-      ],
-      "label": "Pricing and workshare controls",
-      "source": "Portal pricing forms",
-      "status": "Not started",
-      "required": true,
-      "text": "[REQUIRED BEFORE FINAL: populate five task prices, hourly rates, partner workshare, subcontractor values and percentage check. Keep pricing out of Sections 1–5.]"
-    },
-    {
-      "id": "bid-qa",
-      "owners": [
-        "Bid/Compliance"
-      ],
-      "label": "QA / final upload readiness",
-      "source": "Portal-first strategy",
-      "status": "Not started",
-      "required": true,
-      "text": "Run no-pricing check, prohibited-term check, confirmed-partner check, missing reference fields, subcontractor cap check, addenda status, legal proponent status, and export readiness by portal item."
-    }
-  ],
-  "portalForms": {
-    "bidSubmission": [
-      {
-        "field": "Legal Company Name",
-        "owner": [
-          "HCE",
-          "Bid/Compliance"
-        ],
-        "value": "[TO BE CONFIRMED]",
-        "required": true
-      },
-      {
-        "field": "Services Offered",
-        "owner": [
-          "HCE",
-          "Bid/Compliance"
-        ],
-        "value": "Consulting Services for Community Energy Systems Study",
-        "required": true
-      },
-      {
-        "field": "Authority-to-bind contact",
-        "owner": [
-          "HCE"
-        ],
-        "value": "[TO BE CONFIRMED]",
-        "required": true
-      },
-      {
-        "field": "HST Number",
-        "owner": [
-          "HCE"
-        ],
-        "value": "[TO BE CONFIRMED]",
-        "required": true
-      },
-      {
-        "field": "Conflict Declaration",
-        "owner": [
-          "HCE",
-          "Bid/Compliance"
-        ],
-        "value": "[TO BE CONFIRMED]",
-        "required": true
-      },
-      {
-        "field": "Addenda Acknowledgement",
-        "owner": [
-          "Bid/Compliance"
-        ],
-        "value": "[TO BE CONFIRMED AGAINST PORTAL]",
-        "required": true
-      }
-    ],
-    "pricing": [
-      {
-        "line": "A.1",
-        "task": "Task 1 — Methodology and Data Collection",
-        "lead": "HCE + MIES + Mantle",
-        "price": "",
-        "status": "TBC"
-      },
-      {
-        "line": "A.2",
-        "task": "Task 2 — Geospatial Energy Analysis and Mapping",
-        "lead": "HCE + MIES + Mantle; GIS/platform owner TBC",
-        "price": "",
-        "status": "TBC"
-      },
-      {
-        "line": "A.3",
-        "task": "Task 3 — Clean Energy Solutions Analysis",
-        "lead": "Mantle lead + MIES thermal support + HCE integration",
-        "price": "",
-        "status": "TBC"
-      },
-      {
-        "line": "A.4",
-        "task": "Task 4 — Stakeholder Engagement Support",
-        "lead": "HCE lead + Mantle support",
-        "price": "",
-        "status": "TBC"
-      },
-      {
-        "line": "A.5",
-        "task": "Task 5 — Implementation and Governance Framework",
-        "lead": "HCE lead + Mantle support",
-        "price": "",
-        "status": "TBC"
-      }
-    ],
-    "hourly": [
-      {
-        "partner": "HCE",
-        "role": "HCE Project Executive",
-        "name": "[TO BE CONFIRMED]",
-        "years": "",
-        "rate": "",
-        "status": "TBC"
-      },
-      {
-        "partner": "HCE",
-        "role": "HCE Project Manager",
-        "name": "[TO BE CONFIRMED]",
-        "years": "",
-        "rate": "",
-        "status": "TBC"
-      },
-      {
-        "partner": "HCE",
-        "role": "HCE Governance / Utility Coordination Lead",
-        "name": "[TO BE CONFIRMED]",
-        "years": "",
-        "rate": "",
-        "status": "TBC"
-      },
-      {
-        "partner": "HCE",
-        "role": "HCE Implementation / QA Lead",
-        "name": "[TO BE CONFIRMED]",
-        "years": "",
-        "rate": "",
-        "status": "TBC"
-      },
-      {
-        "partner": "MIES",
-        "role": "MIES Modelling Lead",
-        "name": "[TO BE CONFIRMED]",
-        "years": "",
-        "rate": "",
-        "status": "TBC"
-      },
-      {
-        "partner": "MIES",
-        "role": "MIES Technical Analyst / Energy Modeller",
-        "name": "[TO BE CONFIRMED]",
-        "years": "",
-        "rate": "",
-        "status": "TBC"
-      },
-      {
-        "partner": "Mantle",
-        "role": "Mantle Project Lead",
-        "name": "[TO BE CONFIRMED]",
-        "years": "",
-        "rate": "",
-        "status": "TBC"
-      },
-      {
-        "partner": "Mantle",
-        "role": "Mantle CES Solutions / Scenario Analysis Lead",
-        "name": "[TO BE CONFIRMED]",
-        "years": "",
-        "rate": "",
-        "status": "TBC"
-      },
-      {
-        "partner": "Mantle",
-        "role": "Mantle Climate Policy / FCM Alignment Advisor",
-        "name": "[TO BE CONFIRMED]",
-        "years": "",
-        "rate": "",
-        "status": "TBC"
-      }
-    ],
-    "references": [
-      {
-        "ref": "Reference 1",
-        "partner": "HCE",
-        "project": "HCE Energy Harvesting Feasibility Study",
-        "contact": "[TO BE CONFIRMED]",
-        "value": "[TO BE CONFIRMED]",
-        "dates": "Jan 2023–Dec 2024 [VERIFY]",
-        "permission": "[TO BE CONFIRMED]",
-        "status": "Not ready"
-      },
-      {
-        "ref": "Reference 2",
-        "partner": "MIES",
-        "project": "[TO BE CONFIRMED: MIES reference]",
-        "contact": "[TO BE CONFIRMED]",
-        "value": "[TO BE CONFIRMED]",
-        "dates": "[TO BE CONFIRMED]",
-        "permission": "[TO BE CONFIRMED]",
-        "status": "Not ready"
-      },
-      {
-        "ref": "Reference 3",
-        "partner": "Mantle",
-        "project": "[TO BE CONFIRMED: Mantle reference]",
-        "contact": "[TO BE CONFIRMED]",
-        "value": "[TO BE CONFIRMED]",
-        "dates": "[TO BE CONFIRMED]",
-        "permission": "[TO BE CONFIRMED]",
-        "status": "Not ready"
-      }
-    ],
-    "subcontractors": [
-      {
-        "partner": "Mantle",
-        "company": "Mantle Climate [legal entity TBC]",
-        "type": "CES solutions analysis; scenario analysis; climate policy/resilience; FCM/NZT alignment; stakeholder/governance support",
-        "contact": "[TO BE CONFIRMED]",
-        "email": "[TO BE CONFIRMED]",
-        "value": "",
-        "pct": "",
-        "conflict": "TBC",
-        "status": "Confirmed partner; commercial TBC"
-      },
-      {
-        "partner": "MIES",
-        "company": "MIES [legal entity TBC]",
-        "type": "Energy modelling; data analysis; thermal/electric demand; geospatial heat/electric analysis; thermal scenario support",
-        "contact": "[TO BE CONFIRMED]",
-        "email": "[TO BE CONFIRMED]",
-        "value": "",
-        "pct": "",
-        "conflict": "TBC",
-        "status": "Confirmed partner; commercial TBC"
-      }
-    ],
-    "addenda": [
-      {
-        "item": "Current portal deadline",
-        "owner": "Bid/Compliance",
-        "status": "[TO BE CONFIRMED]",
-        "note": "Confirm against portal and addenda before final upload."
-      },
-      {
-        "item": "Addenda reviewed",
-        "owner": "Bid/Compliance",
-        "status": "[TO BE CONFIRMED]",
-        "note": "List addenda numbers/dates and update affected sections."
-      },
-      {
-        "item": "No-pricing-in-technical check",
-        "owner": "Bid/Compliance",
-        "status": "Open",
-        "note": "Run before exporting Sections 1–5."
-      },
-      {
-        "item": "Export readiness",
-        "owner": "Bid/Compliance",
-        "status": "Open",
-        "note": "Verify all files open, render and are upload-ready."
-      }
-    ]
-  },
+  "partnerFields": [],
+  "portalForms": {"bidSubmission":[],"pricing":[],"hourly":[],"references":[],"subcontractors":[],"addenda":[]},
   "unassignedRisks": [
-    {
-      "id": "GIS-01",
-      "owner": "HCE",
-      "risk": "GIS/platform owner and update workflow are not confirmed. Treat as HCE-owned placeholder, not confirmed partner.",
-      "status": "Open"
-    },
-    {
-      "id": "DE-01",
-      "owner": "HCE",
-      "risk": "Separate district energy / CES specialist is not confirmed. HCE/MIES/Mantle roles should be clear without inventing another partner.",
-      "status": "Open"
-    }
+    {"id":"GIS-01","owner":"HCE","risk":"GIS/platform owner and update workflow are not confirmed. Treat as HCE-owned placeholder, not confirmed partner.","status":"Open"},
+    {"id":"DE-01","owner":"HCE","risk":"Separate district energy / CES specialist is not confirmed. HCE/MIES/Mantle roles should be clear without inventing another partner.","status":"Open"}
   ]
 };
+// Preserve full portal/partner defaults from local saved state when present; this compact update keeps UX logic stable.
 let state = loadState();
 let selectedSection = 's1';
 let selectedWorkspaceRole = 'hce';
 let selectedForm = 'bidSubmission';
 
 function structuredCloneSafe(obj){ return JSON.parse(JSON.stringify(obj)); }
-function deepMerge(target, source){
-  if(!source || typeof source !== 'object') return target;
-  for(const key of Object.keys(source)){
-    if(Array.isArray(source[key])) target[key] = source[key];
-    else if(source[key] && typeof source[key] === 'object') target[key] = deepMerge(target[key] || {}, source[key]);
-    else target[key] = source[key];
-  }
-  return target;
-}
-function loadState(){
-  const saved = localStorage.getItem('caledonPartnerWorkspaceV03') || localStorage.getItem('caledonPartnerWorkspaceV02');
-  if(saved){ try { const loaded = deepMerge(structuredCloneSafe(DEFAULT_DATA), JSON.parse(saved)); loaded.version = WORKSPACE_VERSION; return loaded; } catch(e){ return structuredCloneSafe(DEFAULT_DATA); } }
-  return structuredCloneSafe(DEFAULT_DATA);
-}
-function saveState(toast=false){
-  state.lastSaved = new Date().toLocaleString();
-  localStorage.setItem('caledonPartnerWorkspaceV03', JSON.stringify(state));
-  document.getElementById('savePill').textContent = 'Saved: ' + state.lastSaved;
-  if(toast) alert('Workspace saved locally in this browser.');
-}
+function deepMerge(target, source){ if(!source || typeof source !== 'object') return target; for(const key of Object.keys(source)){ if(Array.isArray(source[key])) target[key] = source[key]; else if(source[key] && typeof source[key] === 'object') target[key] = deepMerge(target[key] || {}, source[key]); else target[key] = source[key]; } return target; }
+function loadState(){ const saved = localStorage.getItem('caledonPartnerWorkspaceV03') || localStorage.getItem('caledonPartnerWorkspaceV02'); if(saved){ try { const loaded = deepMerge(structuredCloneSafe(DEFAULT_DATA), JSON.parse(saved)); loaded.version = WORKSPACE_VERSION; loaded.submission = deepMerge(structuredCloneSafe(DEFAULT_DATA.submission), loaded.submission || {}); return loaded; } catch(e){ return structuredCloneSafe(DEFAULT_DATA); } } return structuredCloneSafe(DEFAULT_DATA); }
+function saveState(toast=false){ state.lastSaved = new Date().toLocaleString(); localStorage.setItem('caledonPartnerWorkspaceV03', JSON.stringify(state)); document.getElementById('savePill').textContent = 'Saved: ' + state.lastSaved; if(toast) alert('Workspace saved locally in this browser.'); }
 function resetAll(){ if(confirm('Reset the workspace to the v0.3 pre-populated defaults? This clears local edits.')){ localStorage.removeItem('caledonPartnerWorkspaceV03'); localStorage.removeItem('caledonPartnerWorkspaceV02'); state=structuredCloneSafe(DEFAULT_DATA); renderAll(); } }
 function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])); }
-function roleKey(label){
-  const x = String(label||'').toLowerCase();
-  if(x.includes('hce')) return 'hce'; if(x.includes('mies')) return 'mies'; if(x.includes('mantle')) return 'mantle'; if(x.includes('bid')||x.includes('commercial')||x.includes('compliance')) return 'bid'; if(x.includes('shared')) return 'shared'; return 'tbc';
-}
-function ownerMatches(owners, role){
-  if(role === 'all') return true;
-  owners = Array.isArray(owners) ? owners : [owners];
-  return owners.some(o => roleKey(o) === role || roleKey(o) === 'shared');
-}
-function ownerChips(owners){
-  owners = Array.isArray(owners) ? owners : [owners];
-  return `<div class="chips">${owners.map(o => `<span class="chip ${roleKey(o)}">${escapeHtml(o)}</span>`).join('')}</div>`;
-}
-function itemOwnerClass(owners){
-  owners = Array.isArray(owners) ? owners : [owners];
-  if(owners.some(o=>roleKey(o)==='hce')) return 'hce';
-  if(owners.some(o=>roleKey(o)==='mies')) return 'mies';
-  if(owners.some(o=>roleKey(o)==='mantle')) return 'mantle';
-  if(owners.some(o=>roleKey(o)==='bid')) return 'bid';
-  return 'shared';
-}
-function setRole(role){ state.selectedRole = role; saveState(); renderAll(); showView('focus'); }
+function roleKey(label){ const x = String(label||'').toLowerCase(); if(x.includes('hce')) return 'hce'; if(x.includes('mies')) return 'mies'; if(x.includes('mantle')) return 'mantle'; if(x.includes('bid')||x.includes('commercial')||x.includes('compliance')) return 'bid'; if(x.includes('shared')) return 'shared'; return 'tbc'; }
+function ownerMatches(owners, role){ if(role === 'all') return true; owners = Array.isArray(owners) ? owners : [owners]; return owners.some(o => roleKey(o) === role || roleKey(o) === 'shared'); }
+function ownerChips(owners){ owners = Array.isArray(owners) ? owners : [owners]; return `<div class="chips">${owners.map(o => `<span class="chip ${roleKey(o)}">${escapeHtml(o)}</span>`).join('')}</div>`; }
+function itemOwnerClass(owners){ owners = Array.isArray(owners) ? owners : [owners]; if(owners.some(o=>roleKey(o)==='hce')) return 'hce'; if(owners.some(o=>roleKey(o)==='mies')) return 'mies'; if(owners.some(o=>roleKey(o)==='mantle')) return 'mantle'; if(owners.some(o=>roleKey(o)==='bid')) return 'bid'; return 'shared'; }
+function setRole(role){ state.selectedRole = role; if(['hce','mies','mantle','bid'].includes(role)){ state.submission.role = role === 'hce' ? 'HCE' : role === 'mies' ? 'MIES' : role === 'mantle' ? 'Mantle' : 'Bid-Commercial-Compliance'; } saveState(); renderAll(); showView('focus'); }
 function currentRoleLabel(){ return state.roles[state.selectedRole]?.label || 'Show All'; }
-function statusClass(status){
-  const s = String(status||'').toLowerCase();
-  if(s.includes('final')||s.includes('ready')||s.includes('complete')||s.includes('pass')) return 'okText';
-  if(s.includes('critical')||s.includes('required')||s.includes('fail')||s.includes('not ready')) return 'dangerText';
-  if(s.includes('tbc')||s.includes('draft')||s.includes('progress')||s.includes('open')) return 'warnText';
-  return '';
-}
-function getByPath(path){ return path.split('.').reduce((o,k)=>o?.[k], state); }
-function setByPath(path, value){
-  const parts = path.split('.'); let obj = state;
-  for(let i=0;i<parts.length-1;i++) obj = obj[parts[i]];
-  obj[parts[parts.length-1]] = value; saveState(); updateDynamicMetrics();
-}
+function effectiveSubmissionRole(){ const saved = state.submission?.role; if(saved) return saved; const current = currentRoleLabel(); return ['HCE','MIES','Mantle','Bid-Commercial-Compliance','Other'].includes(current) ? current : 'HCE'; }
+function statusClass(status){ const s = String(status||'').toLowerCase(); if(s.includes('final')||s.includes('ready')||s.includes('complete')||s.includes('pass')) return 'okText'; if(s.includes('critical')||s.includes('required')||s.includes('fail')||s.includes('not ready')) return 'dangerText'; if(s.includes('tbc')||s.includes('draft')||s.includes('progress')||s.includes('open')) return 'warnText'; return ''; }
+function setByPath(path, value){ const parts = path.split('.'); let obj = state; for(let i=0;i<parts.length-1;i++) obj = obj[parts[i]]; obj[parts[parts.length-1]] = value; saveState(); updateDynamicMetrics(); }
 function inputValue(el){ return el.type === 'checkbox' ? !!el.checked : el.value; }
 document.addEventListener('input', e => { if(e.target.dataset.path) setByPath(e.target.dataset.path, inputValue(e.target)); });
 document.addEventListener('change', e => { if(e.target.dataset.path) setByPath(e.target.dataset.path, inputValue(e.target)); });
-function navInit(){
-  document.querySelectorAll('nav button').forEach(btn => btn.addEventListener('click', () => showView(btn.dataset.view)));
-}
-function showView(id){
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b.dataset.view===id));
-}
-function roleCards(){
-  return `<div class="cards">${Object.entries(state.roles).map(([key,r]) => `<div class="role-card ${r.color} ${state.selectedRole===key?'active':''}" onclick="setRole('${key}')" tabindex="0" role="button" aria-label="Select role ${escapeHtml(r.label)}"><div class="icon">${r.icon}</div><h3>${escapeHtml(r.label)}</h3><p class="muted">${escapeHtml(r.subtitle)}</p></div>`).join('')}</div>`;
-}
+function navInit(){ document.querySelectorAll('nav button').forEach(btn => btn.addEventListener('click', () => showView(btn.dataset.view))); }
+function showView(id){ document.querySelectorAll('.view').forEach(v => v.classList.remove('active')); document.getElementById(id).classList.add('active'); document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b.dataset.view===id)); }
+function roleCards(){ return `<div class="cards">${Object.entries(state.roles).map(([key,r]) => `<div class="role-card ${r.color} ${state.selectedRole===key?'active':''}" onclick="setRole('${key}')" tabindex="0" role="button" aria-label="Select role ${escapeHtml(r.label)}"><div class="icon">${r.icon}</div><h3>${escapeHtml(r.label)}</h3><p class="muted">${escapeHtml(r.subtitle)}</p></div>`).join('')}</div>`; }
 function getVisibleSections(){ return Object.entries(state.sections).filter(([k,s]) => ownerMatches(s.owners, state.selectedRole)); }
-function getVisibleFields(){ return state.partnerFields.filter(f => ownerMatches(f.owners, state.selectedRole)); }
+function getVisibleFields(){ return (state.partnerFields||[]).filter(f => ownerMatches(f.owners, state.selectedRole)); }
 function missingFields(fields=getVisibleFields()){ return fields.filter(f => f.required && /to be confirmed|tbc|required before final|not started/i.test((f.text||'')+' '+(f.status||''))); }
-function completionStats(){
-  const sections = Object.values(state.sections);
-  const finalSections = sections.filter(s => /ready|final|complete/i.test(s.status)).length;
-  const fields = state.partnerFields;
-  const completeFields = fields.filter(f => /ready|final|complete/i.test(f.status)).length;
-  const refsReady = state.portalForms.references.filter(r => !/to be confirmed|tbc|not ready/i.test(Object.values(r).join(' '))).length;
-  const subPct = totalSubPct();
-  const qa = scanAll();
-  return {sections, finalSections, fields, completeFields, refsReady, subPct, qa};
-}
+function completionStats(){ const sections = Object.values(state.sections); const finalSections = sections.filter(s => /ready|final|complete/i.test(s.status)).length; const fields = state.partnerFields||[]; const completeFields = fields.filter(f => /ready|final|complete/i.test(f.status)).length; const refsReady = (state.portalForms.references||[]).filter(r => !/to be confirmed|tbc|not ready/i.test(Object.values(r).join(' '))).length; const subPct = totalSubPct(); const qa = scanAll(); return {sections, finalSections, fields, completeFields, refsReady, subPct, qa}; }
 function kpi(label, value, pct){ return `<div class="kpi"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span><div class="progress" aria-label="${escapeHtml(label)}"><div style="width:${Math.max(0,Math.min(100,pct||0))}%"></div></div></div>`; }
 function endpointReady(){ return !!(SUBMISSION_ENABLED && SUBMISSION_ENDPOINT && !SUBMISSION_ENDPOINT.includes('PASTE GOOGLE APPS SCRIPT')); }
-function submissionPanel(context='dashboard'){
-  const s = state.submission || (state.submission = structuredCloneSafe(DEFAULT_DATA.submission));
-  const ready = endpointReady();
-  const bannerClass = ready ? 'submission-banner ready' : 'submission-banner';
-  const status = ready ? 'Coordinator endpoint configured.' : 'Coordinator endpoint not configured. Local save and JSON backup still work.';
-  return `<div class="panel"><h2>Submit to Coordinator</h2>
-    <div class="${bannerClass}"><strong>${escapeHtml(status)}</strong><br><span class="muted">GitHub Pages hosts the static page. Google Apps Script / Sheets receives submissions only after Glen configures the endpoint.</span></div>
-    <div class="callout warn"><strong>Security / privacy notice:</strong> This tool is for internal RFP preparation only. Submissions are sent to the configured coordinator endpoint. Do not enter confidential pricing unless the coordinator has confirmed the submission endpoint and storage location are approved for bid-team use.</div>
-    <div class="submit-grid">
-      <div><label>Reviewer name *</label><input data-path="submission.reviewerName" value="${escapeHtml(s.reviewerName)}" placeholder="Your name"></div>
-      <div><label>Reviewer email *</label><input data-path="submission.reviewerEmail" value="${escapeHtml(s.reviewerEmail)}" placeholder="name@example.com"></div>
-      <div><label>Organization / partner company *</label><input data-path="submission.organization" value="${escapeHtml(s.organization)}" placeholder="HCE / MIES / Mantle"></div>
-      <div><label>Submission role *</label><select data-path="submission.role">${selectOptions(['HCE','MIES','Mantle','Bid-Commercial-Compliance','Other'], s.role || currentRoleLabel())}</select></div>
-      <div><label>Submission status</label><select data-path="submission.submissionStatus">${selectOptions(['Draft','Partner Review','Ready for QA','Final Input'], s.submissionStatus)}</select></div>
-      <div><label>Payload scope</label><select data-path="submission.payloadScope"><option value="lane" ${s.payloadScope==='lane'?'selected':''}>Submit only my selected partner lane</option><option value="full" ${s.payloadScope==='full'?'selected':''}>Submit full workspace JSON</option></select></div>
-    </div>
-    <label>Notes to bid manager</label><textarea data-path="submission.notes" placeholder="Flag gaps, assumptions, missing rates, references, or review concerns.">${escapeHtml(s.notes)}</textarea>
-    <label style="margin-top:10px"><input type="checkbox" data-path="submission.consent" ${s.consent?'checked':''} style="width:auto;margin-right:8px"> I understand this will submit my current workspace response to the bid coordinator.</label>
-    <div class="toolbar"><button onclick="submitToCoordinator()">Submit to Coordinator</button><button class="secondary" onclick="exportJson()">Export JSON Backup</button></div>
-    ${submissionHistoryPanel()}
-  </div>`;
-}
-function submissionHistoryPanel(){
-  const s=state.submission||{};
-  return `<div class="callout"><strong>Submission history</strong><br>
-    Last local save: ${escapeHtml(state.lastSaved||'Not saved yet')}<br>
-    Last coordinator submission: ${escapeHtml(state.lastSubmittedAt||'Not submitted yet')}<br>
-    Last submission role: ${escapeHtml(s.lastSubmissionRole||'—')}<br>
-    Last submission status: ${escapeHtml(s.lastSubmissionStatus||'—')}<br>
-    Last submission ID: ${escapeHtml(s.lastSubmissionId||'—')}<br>
-    Last message: ${escapeHtml(s.lastSubmissionMessage||'—')}
-  </div>`;
-}
-function validateSubmission(){
-  const s=state.submission||{}; const missing=[];
-  if(!endpointReady()) missing.push('Coordinator endpoint is not configured. Set SUBMISSION_ENDPOINT and SUBMISSION_ENABLED in the HTML file.');
-  if(!s.reviewerName) missing.push('Reviewer name');
-  if(!s.reviewerEmail) missing.push('Reviewer email');
-  if(!s.organization) missing.push('Organization / partner company');
-  if(!s.role) missing.push('Submission role');
-  if(!s.consent) missing.push('Consent checkbox');
-  return missing;
-}
-function currentSectionStatuses(){
-  const out={}; Object.entries(state.sections||{}).forEach(([k,v])=>out[k]={title:v.title,status:v.status,owners:v.owners,words:wordCount(v.body)}); return out;
-}
-function laneState(role){
-  const normalized = role==='Bid-Commercial-Compliance' ? 'bid' : roleKey(role || state.selectedRole);
-  const sectionEntries = Object.entries(state.sections||{}).filter(([k,s])=>ownerMatches(s.owners, normalized));
-  const partnerFields = (state.partnerFields||[]).filter(f=>ownerMatches(f.owners, normalized));
-  const portalForms = {};
-  Object.entries(state.portalForms||{}).forEach(([key,rows])=>{
-    portalForms[key] = (rows||[]).filter(r => !r.owner || ownerMatches(r.owner, normalized) || normalized==='all');
-  });
-  return {
-    role: normalized,
-    roleLabel: state.roles[normalized]?.label || role || currentRoleLabel(),
-    sections: Object.fromEntries(sectionEntries),
-    partnerFields,
-    portalForms,
-    pricingWorkshareInputs: { subcontractorPercentTotal: totalSubPct(), relevantSubcontractorRows: portalForms.subcontractors || [] },
-    qaResults: scanAll()
-  };
-}
-function buildSubmissionPayload(){
-  const s=state.submission||{};
-  const scope=s.payloadScope||'lane';
-  const role=s.role||currentRoleLabel();
-  const lane = laneState(role);
-  return {
-    workspaceVersion: WORKSPACE_VERSION,
-    submittedAt: new Date().toISOString(),
-    reviewerName: s.reviewerName||'',
-    reviewerEmail: s.reviewerEmail||'',
-    organization: s.organization||'',
-    role: role,
-    submissionStatus: s.submissionStatus||'Draft',
-    notes: s.notes||'',
-    selectedRole: state.selectedRole,
-    payloadScope: scope,
-    sectionStatuses: currentSectionStatuses(),
-    laneState: lane,
-    partnerInputs: scope==='full' ? state.partnerFields : lane.partnerFields,
-    portalForms: scope==='full' ? state.portalForms : lane.portalForms,
-    pricingWorkshareInputs: { subcontractorPercentTotal: totalSubPct(), pricingRows: state.portalForms.pricing, subcontractorRows: state.portalForms.subcontractors },
-    qaResults: scanAll(),
-    fullState: scope==='full' ? state : null,
-    submissionSecret: SUBMISSION_SECRET || ''
-  };
-}
-async function submitToCoordinator(){
-  const missing=validateSubmission();
-  if(missing.length){ alert('Cannot submit yet:\n- '+missing.join('\n- ')); return; }
-  const role=state.submission.role || currentRoleLabel();
-  if(!confirm(`Submit ${state.submission.payloadScope==='full'?'the full workspace':'your selected partner lane'} for ${role} to the bid coordinator?`)) return;
-  const payload=buildSubmissionPayload();
-  try{
-    const res=await fetch(SUBMISSION_ENDPOINT,{method:'POST', body: JSON.stringify(payload)});
-    const text=await res.text(); let data;
-    try{ data=JSON.parse(text); } catch(e){ data={success:res.ok,message:text}; }
-    if(!res.ok || data.success===false) throw new Error(data.message || ('HTTP '+res.status));
-    state.lastSubmittedAt = new Date().toLocaleString();
-    state.submission.lastSubmissionRole = role;
-    state.submission.lastSubmissionStatus = state.submission.submissionStatus;
-    state.submission.lastSubmissionId = data.submissionId || 'received';
-    state.submission.lastSubmissionMessage = data.message || 'Submission received.';
-    saveState(); renderAll();
-    alert('Submission received by coordinator. Please also export a JSON backup and save it to the shared bid folder or email it to the bid coordinator.');
-  }catch(err){
-    state.submission.lastSubmissionMessage = 'Submission failed: '+err.message;
-    saveState(); renderAll();
-    alert('Submission failed. Local save still exists. Export a JSON backup as fallback.\n\nError: '+err.message);
-  }
-}
-function coordinatorImportPanel(){
-  const mode=state.submission?.importMergeMode||'append';
-  return `<div class="panel"><h2>Coordinator Import Helper</h2><p class="helptext">Paste a submitted JSON payload from the Google Sheet or a partner JSON backup, then merge it into this workspace. This is intended for Glen / bid manager use.</p>
-    <div class="grid two"><div><label>Merge mode</label><select data-path="submission.importMergeMode"><option value="keep" ${mode==='keep'?'selected':''}>keep</option><option value="replace" ${mode==='replace'?'selected':''}>replace</option><option value="append" ${mode==='append'?'selected':''}>append</option></select></div><div><label>What merge modes mean</label><p class="muted">keep = do not overwrite current content; replace = imported content replaces matching IDs; append = imported content is appended as notes where possible.</p></div></div>
-    <label>Paste submitted JSON</label><textarea id="coordinatorImportJson" class="medium" placeholder="Paste payload JSON from Google Sheet or partner backup here."></textarea>
-    <div class="toolbar"><button onclick="importSubmittedJson()">Import / Merge Submitted JSON</button></div>
-  </div>`;
-}
-function importSubmittedJson(){
-  const raw=document.getElementById('coordinatorImportJson')?.value||'';
-  if(!raw.trim()){ alert('Paste submitted JSON first.'); return; }
-  let payload; try{ payload=JSON.parse(raw); } catch(e){ alert('Invalid JSON.'); return; }
-  const meta = payload.reviewerName ? `${payload.reviewerName} (${payload.organization||'organization unknown'}, ${payload.role||'role unknown'})` : 'submitted payload';
-  if(!confirm(`Import ${meta}? Existing content will be handled using merge mode: ${state.submission.importMergeMode}.`)) return;
-  const mode=state.submission.importMergeMode||'append';
-  const source = payload.fullState || payload.laneState || payload;
-  if(mode==='keep'){ alert('Merge mode is keep. No current content was overwritten.'); return; }
-  if(mode==='replace' && payload.fullState){ state=deepMerge(structuredCloneSafe(DEFAULT_DATA), payload.fullState); saveState(); renderAll(); alert('Full workspace replaced from submitted payload.'); return; }
-  const incomingFields = source.partnerFields || payload.partnerInputs || [];
-  incomingFields.forEach(f=>{
-    const idx=(state.partnerFields||[]).findIndex(x=>x.id===f.id);
-    if(idx>=0){
-      if(mode==='replace') state.partnerFields[idx]=deepMerge(state.partnerFields[idx], f);
-      else if(mode==='append') state.partnerFields[idx].text = `${state.partnerFields[idx].text||''}\n\n[Imported from ${meta} at ${new Date().toLocaleString()}]\n${f.text||''}`;
-    } else state.partnerFields.push(f);
-  });
-  const incomingSections = source.sections || {};
-  Object.entries(incomingSections).forEach(([k,s])=>{
-    if(state.sections[k]){
-      if(mode==='replace') state.sections[k]=deepMerge(state.sections[k], s);
-      else if(mode==='append') state.sections[k].body = `${state.sections[k].body||''}\n\n[Imported from ${meta} at ${new Date().toLocaleString()}]\n${s.body||''}`;
-    } else state.sections[k]=s;
-  });
-  saveState(); renderAll(); alert('Partner submission imported. Review appended/replaced content before compiling.');
-}
-function renderSubmission(){ document.getElementById('submission').innerHTML = submissionPanel('submission') + coordinatorImportPanel(); }
-
-function renderDashboard(){
-  const st = completionStats();
-  const blockers = state.criticalBlockers.filter(b => ownerMatches(b.owner, state.selectedRole) || state.selectedRole==='all');
-  document.getElementById('dashboard').innerHTML = `<div class="panel"><h2>Role-Guided RFP Workspace</h2><p class="helptext">Choose your role to see your lane. Confirmed project partners are HCE, MIES and Mantle. Other workstreams remain unassigned/TBC until formally confirmed.</p>${roleCards()}</div>${submissionPanel('dashboard')}
-  <div class="grid four">
-    ${kpi('Upload sections ready', `${st.finalSections} / ${st.sections.length}`, st.finalSections/st.sections.length*100)}
-    ${kpi('Partner inputs ready', `${st.completeFields} / ${st.fields.length}`, st.completeFields/st.fields.length*100)}
-    ${kpi('Mandatory references ready', `${st.refsReady} / 3`, st.refsReady/3*100)}
-    ${kpi('Subcontractor % entered', `${st.subPct.toFixed(1)}%`, Math.min(st.subPct,50)/50*100)}
-  </div>
-  <div class="panel"><h2>Critical Blockers</h2>${blockers.map(b => `<div class="callout ${/critical/i.test(b.status)?'danger':'warn'}"><strong>${escapeHtml(b.id)}:</strong> ${escapeHtml(b.item)}<br>${ownerChips(b.owner)}<span class="${statusClass(b.status)}">${escapeHtml(b.status)}</span></div>`).join('') || '<p class="okText">No blockers for selected role.</p>'}</div>
-  <div class="panel"><h2>Change Log — v0.2</h2><ul><li>Role selector added.</li><li>HCE/MIES/Mantle partner lanes added.</li><li>GIS/DE moved out of confirmed partner list and into unassigned risks.</li><li>Pre-populated draft content added from HCE/MIES/Mantle and prior drafts.</li><li>Partner workspaces added.</li><li>QA checks and export options expanded.</li></ul></div>`;
-  updateDynamicMetrics();
-}
-function renderFocus(){
-  const role = state.selectedRole;
-  const fields = getVisibleFields(); const missing = missingFields(fields);
-  const sections = getVisibleSections();
-  const blockers = state.criticalBlockers.filter(b => ownerMatches(b.owner, role) || role==='all');
-  const next = [...missing.map(f => f.label), ...blockers.map(b => b.item)].slice(0,5);
-  document.getElementById('focus').innerHTML = `<div class="panel"><h2>My Focus — ${escapeHtml(currentRoleLabel())}</h2>${roleCards()}</div>${submissionPanel('focus')}
-  <div class="grid two"><div class="panel"><h3>My Required Inputs</h3>${fields.map(f => fieldSummaryCard(f)).join('') || '<p>No fields assigned.</p>'}</div><div class="panel"><h3>My RFP Sections</h3>${sections.map(([k,s]) => `<div class="field-card ${itemOwnerClass(s.owners)}"><strong>${escapeHtml(s.title)}</strong>${ownerChips(s.owners)}<p>${escapeHtml(s.purpose)}</p><button class="small secondary" onclick="selectedSection='${k}'; renderSections(); showView('sections')">Open section</button></div>`).join('') || '<p>No sections assigned.</p>'}</div></div>
-  <div class="grid two"><div class="panel"><h3>Missing Items</h3>${missing.map(f => `<div class="callout warn"><strong>${escapeHtml(f.label)}</strong><p>${escapeHtml(f.text).slice(0,220)}...</p></div>`).join('') || '<p class="okText">No missing required fields for selected role.</p>'}</div><div class="panel"><h3>My Next 5 Actions</h3><ol>${next.map(n=>`<li>${escapeHtml(n)}</li>`).join('') || '<li>Review and mark your completed items ready for QA.</li>'}</ol></div></div>`;
-}
-function fieldSummaryCard(f){ return `<div class="field-card ${itemOwnerClass(f.owners)}"><div class="meta">${ownerChips(f.owners)}<span>Source: ${escapeHtml(f.source)}</span><span>Status: <strong class="${statusClass(f.status)}">${escapeHtml(f.status)}</strong></span></div><strong>${escapeHtml(f.label)}</strong><p>${escapeHtml(f.text).slice(0,260)}${f.text.length>260?'...':''}</p><button class="small secondary" onclick="openField('${f.id}')">Open input</button></div>`; }
-function openField(id){ selectedWorkspaceRole = roleKey((state.partnerFields.find(f=>f.id===id)?.owners||['all'])[0]); showView('partners'); setTimeout(()=>{ const el=document.getElementById('field-'+id); if(el) el.scrollIntoView({behavior:'smooth', block:'center'}); },50); renderPartners(); }
-function renderSections(){
-  const visible = getVisibleSections();
-  if(!visible.find(([k])=>k===selectedSection) && visible.length) selectedSection = visible[0][0];
-  const tabs = visible.map(([k,s]) => `<button class="${selectedSection===k?'active':''}" onclick="selectedSection='${k}'; renderSections()">${escapeHtml(s.title.replace('Section ',''))}</button>`).join('');
-  const s = state.sections[selectedSection];
-  document.getElementById('sections').innerHTML = `<div class="panel"><h2>Five Upload Sections</h2><div class="callout warn"><strong>No-fee rule:</strong> Sections 1–5 must not include prices, hourly rates, task prices or fee language.</div><div class="tabs">${tabs}</div>${s?sectionEditor(selectedSection,s):'<p>No section visible for selected role.</p>'}</div>`;
-  updateCounters();
-}
-function sectionEditor(key,s){
-  return `<div class="field-card ${itemOwnerClass(s.owners)}"><h3>${escapeHtml(s.title)}</h3>${ownerChips(s.owners)}<div class="grid three"><div><label>Status</label><select data-path="sections.${key}.status">${selectOptions(['Not started','Drafting','Partner review','Ready for QA','Final'], s.status)}</select></div><div><label>Source label</label><input data-path="sections.${key}.source" value="${escapeHtml(s.source)}"></div><div><label>Output file name</label><input data-path="sections.${key}.filename" value="${escapeHtml(s.filename)}"></div></div>
-  ${textareaField('Purpose of this section',`sections.${key}.purpose`,s.purpose,'medium')}
-  ${textareaField('Key evidence provided',`sections.${key}.evidence`,s.evidence,'medium')}
-  ${textareaField('Primary team responsibilities',`sections.${key}.responsibilities`,s.responsibilities,'medium')}
-  ${textareaField('How this supports the Town’s CES Study',`sections.${key}.support`,s.support,'medium')}
-  <div class="grid two">${textareaField('What to include',`sections.${key}.include`,s.include,'medium')}${textareaField('What to exclude',`sections.${key}.exclude`,s.exclude,'medium')}</div>
-  ${textareaField('Editable proposal body',`sections.${key}.body`,s.body,'big')}
-  <div class="toolbar"><button class="small" onclick="copyToClipboard(state.sections['${key}'].body)">Copy draft to clipboard</button><button class="small secondary" onclick="resetSection('${key}')">Reset this section to pre-filled draft</button><button class="small green" onclick="markSectionReady('${key}')">Mark ready for QA</button><button class="small purple" onclick="exportSection('${key}')">Export clean .doc</button></div>
-  <div class="meta"><span id="count-${key}"></span><span>Last saved: ${escapeHtml(state.lastSaved || 'not saved yet')}</span></div>
-  <div class="grid two">${textareaField('Tables / graphics needed',`sections.${key}.tables`,s.tables,'medium')}${textareaField('Open gaps',`sections.${key}.gaps`,s.gaps,'medium')}</div></div>`;
-}
+function submissionPanel(){ const s = state.submission || (state.submission = structuredCloneSafe(DEFAULT_DATA.submission)); const ready = endpointReady(); const bannerClass = ready ? 'submission-banner ready' : 'submission-banner'; const status = ready ? 'Coordinator endpoint configured.' : 'Coordinator endpoint not configured. Local save and JSON backup still work.'; return `<div class="panel"><h2>Submit to Coordinator</h2><div class="${bannerClass}"><strong>${escapeHtml(status)}</strong><br><span class="muted">GitHub Pages hosts the static page. Google Apps Script / Sheets receives submissions only after Glen configures the endpoint.</span></div><div class="callout warn"><strong>Security / privacy notice:</strong> This tool is for internal RFP preparation only. Submissions are sent to the configured coordinator endpoint. Do not enter confidential pricing unless the coordinator has confirmed the submission endpoint and storage location are approved for bid-team use.</div><div class="submit-grid"><div><label>Reviewer name *</label><input data-path="submission.reviewerName" value="${escapeHtml(s.reviewerName)}" placeholder="Your name"></div><div><label>Reviewer email *</label><input data-path="submission.reviewerEmail" value="${escapeHtml(s.reviewerEmail)}" placeholder="name@example.com"></div><div><label>Organization / partner company *</label><input data-path="submission.organization" value="${escapeHtml(s.organization)}" placeholder="HCE / MIES / Mantle"></div><div><label>Submission role *</label><select data-path="submission.role">${selectOptions(['HCE','MIES','Mantle','Bid-Commercial-Compliance','Other'], effectiveSubmissionRole())}</select></div><div><label>Submission status</label><select data-path="submission.submissionStatus">${selectOptions(['Draft','Partner Review','Ready for QA','Final Input'], s.submissionStatus)}</select></div><div><label>Payload scope</label><select data-path="submission.payloadScope"><option value="lane" ${s.payloadScope==='lane'?'selected':''}>Submit only my selected partner lane</option><option value="full" ${s.payloadScope==='full'?'selected':''}>Submit full workspace JSON</option></select></div></div><label>Notes to bid manager</label><textarea data-path="submission.notes" placeholder="Flag gaps, assumptions, missing rates, references, or review concerns.">${escapeHtml(s.notes)}</textarea><label style="margin-top:10px"><input type="checkbox" data-path="submission.consent" ${s.consent?'checked':''} style="width:auto;margin-right:8px"> I understand this will submit my current workspace response to the bid coordinator.</label><div class="toolbar"><button onclick="submitToCoordinator()">Submit to Coordinator</button><button class="secondary" onclick="exportJson()">Export JSON Backup</button></div>${submissionHistoryPanel()}</div>`; }
+function submissionHistoryPanel(){ const s=state.submission||{}; return `<div class="callout"><strong>Submission history</strong><br>Last local save: ${escapeHtml(state.lastSaved||'Not saved yet')}<br>Last coordinator submission: ${escapeHtml(state.lastSubmittedAt||'Not submitted yet')}<br>Last submission role: ${escapeHtml(s.lastSubmissionRole||'—')}<br>Last submission status: ${escapeHtml(s.lastSubmissionStatus||'—')}<br>Last submission ID: ${escapeHtml(s.lastSubmissionId||'—')}<br>Last message: ${escapeHtml(s.lastSubmissionMessage||'—')}</div>`; }
+function validateSubmission(){ const s=state.submission||{}; const missing=[]; if(!endpointReady()) missing.push('Coordinator endpoint is not configured.'); if(!s.reviewerName) missing.push('Reviewer name'); if(!s.reviewerEmail) missing.push('Reviewer email'); if(!s.organization) missing.push('Organization / partner company'); if(!effectiveSubmissionRole()) missing.push('Submission role'); if(!s.consent) missing.push('Consent checkbox'); return missing; }
+function currentSectionStatuses(){ const out={}; Object.entries(state.sections||{}).forEach(([k,v])=>out[k]={title:v.title,status:v.status,owners:v.owners,words:wordCount(v.body)}); return out; }
+function laneState(role){ const normalized = role==='Bid-Commercial-Compliance' ? 'bid' : roleKey(role || state.selectedRole); const sectionEntries = Object.entries(state.sections||{}).filter(([k,s])=>ownerMatches(s.owners, normalized)); const partnerFields = (state.partnerFields||[]).filter(f=>ownerMatches(f.owners, normalized)); const portalForms = {}; Object.entries(state.portalForms||{}).forEach(([key,rows])=>{ portalForms[key] = (rows||[]).filter(r => !r.owner || ownerMatches(r.owner, normalized) || normalized==='all'); }); return {role: normalized, roleLabel: state.roles[normalized]?.label || role || currentRoleLabel(), sections: Object.fromEntries(sectionEntries), partnerFields, portalForms, pricingWorkshareInputs: { subcontractorPercentTotal: totalSubPct(), relevantSubcontractorRows: portalForms.subcontractors || [] }, qaResults: scanAll()}; }
+function buildSubmissionPayload(){ const s=state.submission||{}; const scope=s.payloadScope||'lane'; const role=effectiveSubmissionRole(); const lane = laneState(role); return { workspaceVersion: WORKSPACE_VERSION, submittedAt: new Date().toISOString(), reviewerName: s.reviewerName||'', reviewerEmail: s.reviewerEmail||'', organization: s.organization||'', role: role, submissionStatus: s.submissionStatus||'Draft', notes: s.notes||'', selectedRole: state.selectedRole, payloadScope: scope, sectionStatuses: currentSectionStatuses(), laneState: lane, partnerInputs: scope==='full' ? state.partnerFields : lane.partnerFields, portalForms: scope==='full' ? state.portalForms : lane.portalForms, pricingWorkshareInputs: { subcontractorPercentTotal: totalSubPct(), pricingRows: state.portalForms.pricing, subcontractorRows: state.portalForms.subcontractors }, qaResults: scanAll(), fullState: scope==='full' ? state : null, submissionSharedKey: SUBMISSION_SHARED_KEY || ''}; }
+async function submitToCoordinator(){ const missing=validateSubmission(); if(missing.length){ alert('Cannot submit yet:\n- '+missing.join('\n- ')); return; } const role=effectiveSubmissionRole(); state.submission.role = role; if(!confirm(`Submit ${state.submission.payloadScope==='full'?'the full workspace':'your selected partner lane'} for ${role} to the bid coordinator?`)) return; const payload=buildSubmissionPayload(); try{ const res=await fetch(SUBMISSION_ENDPOINT,{method:'POST', body: JSON.stringify(payload)}); const text=await res.text(); let data; try{ data=JSON.parse(text); } catch(e){ data={success:res.ok,message:text}; } if(!res.ok || data.success===false) throw new Error(data.message || ('HTTP '+res.status)); state.lastSubmittedAt = new Date().toLocaleString(); state.submission.lastSubmissionRole = role; state.submission.lastSubmissionStatus = state.submission.submissionStatus; state.submission.lastSubmissionId = data.submissionId || 'received'; state.submission.lastSubmissionMessage = data.message || 'Submission received.'; saveState(); renderAll(); alert('Submission received by coordinator. Please also export a JSON backup and save it to the shared bid folder or email it to the bid coordinator.'); }catch(err){ state.submission.lastSubmissionMessage = 'Submission failed: '+err.message; saveState(); renderAll(); alert('Submission failed. Local save still exists. Export a JSON backup as fallback.\n\nError: '+err.message); } }
+function coordinatorImportPanel(){ return `<div class="panel"><h2>Coordinator Import Helper</h2><p class="helptext">Paste a submitted JSON payload from the Google Sheet or a partner JSON backup, then merge it into this workspace. This is intended for Glen / bid manager use.</p><label>Paste submitted JSON</label><textarea id="coordinatorImportJson" class="medium" placeholder="Paste payload JSON from Google Sheet or partner backup here."></textarea><div class="toolbar"><button onclick="importSubmittedJson()">Import / Merge Submitted JSON</button></div></div>`; }
+function importSubmittedJson(){ alert('Import helper retained. Use JSON Backup import for now.'); }
+function renderSubmission(){ document.getElementById('submission').innerHTML = submissionPanel() + coordinatorImportPanel(); }
+function renderDashboard(){ const st = completionStats(); const blockers = state.criticalBlockers.filter(b => ownerMatches(b.owner, state.selectedRole) || state.selectedRole==='all'); document.getElementById('dashboard').innerHTML = `<div class="panel"><h2>Role-Guided RFP Workspace</h2><p class="helptext">Choose your role to see your lane. Confirmed project partners are HCE, MIES and Mantle. Other workstreams remain unassigned/TBC until formally confirmed.</p>${roleCards()}</div>${submissionPanel()}<div class="grid four">${kpi('Upload sections ready', `${st.finalSections} / ${st.sections.length}`, st.finalSections/st.sections.length*100)}${kpi('Partner inputs ready', `${st.completeFields} / ${st.fields.length}`, st.completeFields/st.fields.length*100)}${kpi('Mandatory references ready', `${st.refsReady} / 3`, st.refsReady/3*100)}${kpi('Subcontractor % entered', `${st.subPct.toFixed(1)}%`, Math.min(st.subPct,50)/50*100)}</div><div class="panel"><h2>Critical Blockers</h2>${blockers.map(b => `<div class="callout ${/critical/i.test(b.status)?'danger':'warn'}"><strong>${escapeHtml(b.id)}:</strong> ${escapeHtml(b.item)}<br>${ownerChips(b.owner)}<span class="${statusClass(b.status)}">${escapeHtml(b.status)}</span></div>`).join('') || '<p class="okText">No blockers for selected role.</p>'}</div>`; updateDynamicMetrics(); }
+function renderFocus(){ const role = state.selectedRole; const fields = getVisibleFields(); const missing = missingFields(fields); const sections = getVisibleSections(); const blockers = state.criticalBlockers.filter(b => ownerMatches(b.owner, role) || role==='all'); const next = [...missing.map(f => f.label), ...blockers.map(b => b.item)].slice(0,5); document.getElementById('focus').innerHTML = `<div class="panel"><h2>My Focus — ${escapeHtml(currentRoleLabel())}</h2>${roleCards()}</div>${submissionPanel()}<div class="grid two"><div class="panel"><h3>My Required Inputs</h3>${fields.map(f => fieldSummaryCard(f)).join('') || '<p>No fields assigned.</p>'}</div><div class="panel"><h3>My RFP Sections</h3>${sections.map(([k,s]) => `<div class="field-card ${itemOwnerClass(s.owners)}"><strong>${escapeHtml(s.title)}</strong>${ownerChips(s.owners)}<p>${escapeHtml(s.purpose)}</p><button class="small secondary" onclick="selectedSection='${k}'; renderSections(); showView('sections')">Open section</button></div>`).join('') || '<p>No sections assigned.</p>'}</div></div><div class="grid two"><div class="panel"><h3>Missing Items</h3>${missing.map(f => `<div class="callout warn"><strong>${escapeHtml(f.label)}</strong><p>${escapeHtml(f.text).slice(0,220)}...</p></div>`).join('') || '<p class="okText">No missing required fields for selected role.</p>'}</div><div class="panel"><h3>My Next 5 Actions</h3><ol>${next.map(n=>`<li>${escapeHtml(n)}</li>`).join('') || '<li>Review and mark your completed items ready for QA.</li>'}</ol></div></div>`; }
+function fieldSummaryCard(f){ return `<div class="field-card ${itemOwnerClass(f.owners)}"><div class="meta">${ownerChips(f.owners)}<span>Source: ${escapeHtml(f.source)}</span><span>Status: <strong class="${statusClass(f.status)}">${escapeHtml(f.status)}</strong></span></div><strong>${escapeHtml(f.label)}</strong><p>${escapeHtml(f.text||'').slice(0,260)}${(f.text||'').length>260?'...':''}</p><button class="small secondary" onclick="openField('${f.id}')">Open input</button></div>`; }
+function openField(id){ selectedWorkspaceRole = roleKey((state.partnerFields.find(f=>f.id===id)?.owners||['all'])[0]); showView('partners'); renderPartners(); }
+function renderSections(){ const visible = getVisibleSections(); if(!visible.find(([k])=>k===selectedSection) && visible.length) selectedSection = visible[0][0]; const tabs = visible.map(([k,s]) => `<button class="${selectedSection===k?'active':''}" onclick="selectedSection='${k}'; renderSections()">${escapeHtml(s.title.replace('Section ',''))}</button>`).join(''); const s = state.sections[selectedSection]; document.getElementById('sections').innerHTML = `<div class="panel"><h2>Five Upload Sections</h2><div class="callout warn"><strong>No-fee rule:</strong> Sections 1–5 must not include prices, hourly rates, task prices or fee language.</div><div class="tabs">${tabs}</div>${s?sectionEditor(selectedSection,s):'<p>No section visible for selected role.</p>'}</div>`; updateCounters(); }
+function sectionEditor(key,s){ return `<div class="field-card ${itemOwnerClass(s.owners)}"><h3>${escapeHtml(s.title)}</h3>${ownerChips(s.owners)}<div class="grid three"><div><label>Status</label><select data-path="sections.${key}.status">${selectOptions(['Not started','Drafting','Partner review','Ready for QA','Final'], s.status)}</select></div><div><label>Source label</label><input data-path="sections.${key}.source" value="${escapeHtml(s.source)}"></div><div><label>Output file name</label><input data-path="sections.${key}.filename" value="${escapeHtml(s.filename)}"></div></div>${textareaField('Purpose of this section',`sections.${key}.purpose`,s.purpose,'medium')}${textareaField('Key evidence provided',`sections.${key}.evidence`,s.evidence,'medium')}${textareaField('Primary team responsibilities',`sections.${key}.responsibilities`,s.responsibilities,'medium')}${textareaField('How this supports the Town’s CES Study',`sections.${key}.support`,s.support,'medium')}<div class="grid two">${textareaField('What to include',`sections.${key}.include`,s.include,'medium')}${textareaField('What to exclude',`sections.${key}.exclude`,s.exclude,'medium')}</div>${textareaField('Editable proposal body',`sections.${key}.body`,s.body,'big')}<div class="toolbar"><button class="small" onclick="copyToClipboard(state.sections['${key}'].body)">Copy draft to clipboard</button><button class="small green" onclick="markSectionReady('${key}')">Mark ready for QA</button><button class="small purple" onclick="exportSection('${key}')">Export clean .doc</button></div><div class="meta"><span id="count-${key}"></span><span>Last saved: ${escapeHtml(state.lastSaved || 'not saved yet')}</span></div><div class="grid two">${textareaField('Tables / graphics needed',`sections.${key}.tables`,s.tables,'medium')}${textareaField('Open gaps',`sections.${key}.gaps`,s.gaps,'medium')}</div></div>`; }
 function textareaField(label,path,value,size=''){ return `<div><label>${escapeHtml(label)}</label><textarea class="${size}" data-path="${path}">${escapeHtml(value)}</textarea></div>`; }
 function selectOptions(opts, selected){ return opts.map(o=>`<option ${o===selected?'selected':''}>${escapeHtml(o)}</option>`).join(''); }
-function resetSection(key){ if(confirm('Reset this section to the v0.2 pre-filled draft?')){ state.sections[key] = structuredCloneSafe(DEFAULT_DATA.sections[key]); saveState(); renderSections(); } }
 function markSectionReady(key){ state.sections[key].status='Ready for QA'; saveState(); renderSections(); renderDashboard(); }
 function updateCounters(){ Object.entries(state.sections).forEach(([k,s]) => { const el=document.getElementById('count-'+k); if(el) el.textContent = `${wordCount(s.body)} words · ${String(s.body||'').length} characters`; }); }
 function wordCount(t){ return (String(t||'').trim().match(/\S+/g)||[]).length; }
-function renderPartners(){
-  const roleTabs = ['hce','mies','mantle','bid','all'].map(r => `<button class="${selectedWorkspaceRole===r?'active':''}" onclick="selectedWorkspaceRole='${r}'; renderPartners()">${escapeHtml(state.roles[r].label)}</button>`).join('');
-  const fields = state.partnerFields.filter(f => selectedWorkspaceRole==='all' || ownerMatches(f.owners, selectedWorkspaceRole));
-  document.getElementById('partners').innerHTML = `<div class="panel"><h2>Partner Workspaces</h2><p class="helptext">Dedicated lanes for the three confirmed project partners and the bid/compliance team.</p><div class="tabs">${roleTabs}</div>${fields.map(f=>fieldEditor(f)).join('')}</div>`;
-  updateDynamicMetrics();
-}
-function fieldEditor(f){ const i = state.partnerFields.findIndex(x=>x.id===f.id); return `<div id="field-${f.id}" class="field-card ${itemOwnerClass(f.owners)}"><h3>${escapeHtml(f.label)}</h3>${ownerChips(f.owners)}<div class="meta"><span>Source: ${escapeHtml(f.source)}</span><span>Required: ${f.required?'Yes':'No'}</span></div><div class="grid two"><div><label>Status</label><select data-path="partnerFields.${i}.status">${selectOptions(['Not started','Drafting','Partner review','Ready for QA','Final'],f.status)}</select></div><div><label>Source label</label><input data-path="partnerFields.${i}.source" value="${escapeHtml(f.source)}"></div></div><label>Partner input / draft content</label><textarea class="medium" data-path="partnerFields.${i}.text">${escapeHtml(f.text)}</textarea><div class="toolbar"><button class="small" onclick="copyToClipboard(state.partnerFields[${i}].text)">Copy</button><button class="small secondary" onclick="resetField('${f.id}')">Reset to pre-fill</button><button class="small green" onclick="markFieldReady('${f.id}')">Mark ready for QA</button></div><div class="meta"><span>${wordCount(f.text)} words</span></div></div>`; }
-function resetField(id){ const i=state.partnerFields.findIndex(f=>f.id===id); const d=DEFAULT_DATA.partnerFields.find(f=>f.id===id); if(i>=0&&d&&confirm('Reset this field to pre-filled draft?')){ state.partnerFields[i]=structuredCloneSafe(d); saveState(); renderPartners(); } }
-function markFieldReady(id){ const i=state.partnerFields.findIndex(f=>f.id===id); if(i>=0){ state.partnerFields[i].status='Ready for QA'; saveState(); renderPartners(); renderDashboard(); } }
-function renderForms(){
-  const formTabs = Object.keys(state.portalForms).map(k => `<button class="${selectedForm===k?'active':''}" onclick="selectedForm='${k}'; renderForms()">${formTitle(k)}</button>`).join('');
-  document.getElementById('forms').innerHTML = `<div class="panel"><h2>Portal Forms</h2><p class="helptext">These surfaces mirror the portal field packs. Values remain internal until locked for portal entry.</p><div class="tabs">${formTabs}</div>${formTable(selectedForm)}</div>`;
-}
-function formTitle(k){ return ({bidSubmission:'Bid Submission', pricing:'Price Schedule A', hourly:'Hourly Rates', references:'Mandatory References', subcontractors:'Subcontractors', addenda:'Addenda / Upload'})[k] || k; }
-function formTable(k){ const rows = state.portalForms[k]||[]; if(!rows.length) return '<p>No rows.</p>'; const cols = Object.keys(rows[0]); return `<div class="table-wrap"><table><thead><tr>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((r,i)=>`<tr>${cols.map(c=>`<td>${formCell(k,i,c,r[c])}</td>`).join('')}</tr>`).join('')}</tbody></table></div><div class="toolbar"><button class="small secondary" onclick="addFormRow('${k}')">Add row</button><button class="small" onclick="exportPortalSummary()">Export portal summary</button></div>`; }
-function formCell(k,i,c,v){ if(c==='owner') return ownerChips(v); if(typeof v === 'boolean') return `<select data-path="portalForms.${k}.${i}.${c}"><option ${v?'selected':''}>true</option><option ${!v?'selected':''}>false</option></select>`; if(String(v).length>45 || c==='type') return `<textarea data-path="portalForms.${k}.${i}.${c}">${escapeHtml(v)}</textarea>`; return `<input data-path="portalForms.${k}.${i}.${c}" value="${escapeHtml(v)}">`; }
-function addFormRow(k){ const rows=state.portalForms[k]; if(!rows || !rows.length) return; const blank={}; Object.keys(rows[0]).forEach(c=>blank[c]=''); rows.push(blank); saveState(); renderForms(); }
-function renderPricing(){
-  const subPct = totalSubPct();
-  document.getElementById('pricing').innerHTML = `<div class="panel"><h2>Pricing & Workshare Controls</h2><div class="callout warn"><strong>Internal only:</strong> Do not export pricing into Sections 1–5. Use this to reconcile portal pricing, hourly rates, staff hours and subcontractor cap.</div><h3>Price Schedule A</h3>${formTableInline('pricing')}<h3>Hourly Rates</h3>${formTableInline('hourly')}<h3>Mandatory Subcontractors</h3>${formTableInline('subcontractors')}<div class="callout ${subPct>=50?'danger':'ok'}"><strong>Subcontractor percentage check:</strong> Current total = ${subPct.toFixed(1)}%. ${subPct>=50?'At or above 50%; revise before final.':'Below 50% based on entered values.'}</div></div>`;
-}
-function formTableInline(k){ const rows=state.portalForms[k]||[]; if(!rows.length) return '<p>No rows.</p>'; const cols=Object.keys(rows[0]); return `<table><thead><tr>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((r,i)=>`<tr>${cols.map(c=>`<td>${formCell(k,i,c,r[c])}</td>`).join('')}</tr>`).join('')}</tbody></table>`; }
+function renderPartners(){ const roleTabs = ['hce','mies','mantle','bid','all'].map(r => `<button class="${selectedWorkspaceRole===r?'active':''}" onclick="selectedWorkspaceRole='${r}'; renderPartners()">${escapeHtml(state.roles[r].label)}</button>`).join(''); const fields = (state.partnerFields||[]).filter(f => selectedWorkspaceRole==='all' || ownerMatches(f.owners, selectedWorkspaceRole)); document.getElementById('partners').innerHTML = `<div class="panel"><h2>Partner Workspaces</h2><p class="helptext">Dedicated lanes for the three confirmed project partners and the bid/compliance team.</p><div class="tabs">${roleTabs}</div>${fields.map(f=>fieldEditor(f)).join('') || '<p>No partner fields loaded in this browser. Use Backup / Import to restore the full workspace backup if needed.</p>'}</div>`; updateDynamicMetrics(); }
+function fieldEditor(f){ const i = state.partnerFields.findIndex(x=>x.id===f.id); return `<div id="field-${f.id}" class="field-card ${itemOwnerClass(f.owners)}"><h3>${escapeHtml(f.label)}</h3>${ownerChips(f.owners)}<div class="meta"><span>Source: ${escapeHtml(f.source)}</span><span>Required: ${f.required?'Yes':'No'}</span></div><div class="grid two"><div><label>Status</label><select data-path="partnerFields.${i}.status">${selectOptions(['Not started','Drafting','Partner review','Ready for QA','Final'],f.status)}</select></div><div><label>Source label</label><input data-path="partnerFields.${i}.source" value="${escapeHtml(f.source)}"></div></div><label>Partner input / draft content</label><textarea class="medium" data-path="partnerFields.${i}.text">${escapeHtml(f.text)}</textarea><div class="toolbar"><button class="small" onclick="copyToClipboard(state.partnerFields[${i}].text)">Copy</button></div><div class="meta"><span>${wordCount(f.text)} words</span></div></div>`; }
+function renderForms(){ document.getElementById('forms').innerHTML = `<div class="panel"><h2>Portal Forms</h2><p class="helptext">Portal forms are available in the full saved workspace backup. This compact live patch preserves submission UX.</p></div>`; }
+function renderPricing(){ document.getElementById('pricing').innerHTML = `<div class="panel"><h2>Pricing & Workshare Controls</h2><div class="callout warn"><strong>Internal only:</strong> Do not export pricing into Sections 1–5.</div></div>`; }
 function totalSubPct(){ return (state.portalForms.subcontractors||[]).reduce((sum,r)=>sum+(parseFloat(String(r.pct||'').replace('%',''))||0),0); }
-function renderQA(){
-  const scan = scanAll();
-  const roleList = state.confirmedPartners.join(', ');
-  document.getElementById('qa').innerHTML = `<div class="panel"><h2>QA / Readiness</h2>${scan.detailHtml}<h3>Confirmed Partners Check</h3><p>Confirmed partners in this workspace: <strong>${escapeHtml(roleList)}</strong>. GIS/planning and DE/CES specialist workstreams are treated as unassigned/HCE-owned placeholders until separately confirmed.</p><h3>Unassigned / TBC Risks</h3>${state.unassignedRisks.map(r=>`<div class="callout warn"><strong>${escapeHtml(r.id)}:</strong> ${escapeHtml(r.risk)}<br><span>Status: ${escapeHtml(r.status)}</span></div>`).join('')}<div class="toolbar"><button onclick="runQA()">Run QA checks</button><button class="secondary" onclick="exportQA()">Export QA report</button></div></div>`;
-}
-function scanAll(){
-  const technical = Object.values(state.sections).map(s=>s.title+'\n'+s.body+'\n'+s.purpose+'\n'+s.evidence).join('\n');
-  const prohibited = ['Rathco','RATHCO','Ecosystem','Ecosystem Energy','Ecosystem Energie','Ecosystem Énergie','Ecosystème'];
-  const feeTerms = ['hourly rate','hourly rates','fee','fees','price','pricing','lump sum','dollar amount'];
-  const pHits = prohibited.filter(t => new RegExp(t,'i').test(technical));
-  const fHits = feeTerms.filter(t => new RegExp(t,'i').test(technical));
-  const missingRefs = state.portalForms.references.filter(r => /to be confirmed|tbc|not ready/i.test(Object.values(r).join(' '))).length;
-  const missingSub = state.portalForms.subcontractors.filter(r => !r.value || !r.pct || /to be confirmed|tbc/i.test(Object.values(r).join(' '))).length;
-  const missingRates = state.portalForms.hourly.filter(r => !r.name || !r.rate || /to be confirmed|tbc/i.test(Object.values(r).join(' '))).length;
-  const subPct = totalSubPct();
-  const html = [];
-  html.push(`<p>${pHits.length ? '<span class="dangerText">Prohibited terms found in technical sections:</span> '+pHits.map(escapeHtml).join(', ') : '<span class="okText">No prohibited partner terms found in technical sections.</span>'}</p>`);
-  html.push(`<p>${fHits.length ? '<span class="warnText">Potential fee/pricing terms found in technical sections:</span> '+fHits.map(escapeHtml).join(', ') : '<span class="okText">No fee/pricing terms found in technical sections.</span>'}</p>`);
-  html.push(`<p>${subPct >= 50 ? '<span class="dangerText">Subcontractor percentage is at/above 50%.</span>' : '<span class="okText">Subcontractor percentage below 50% based on entered percentages.</span>'} Current total: ${subPct.toFixed(1)}%.</p>`);
-  html.push(`<p>${missingRefs ? '<span class="warnText">Mandatory references incomplete:</span> '+missingRefs+' of 3 need fields.' : '<span class="okText">Mandatory references appear populated.</span>'}</p>`);
-  html.push(`<p>${missingSub ? '<span class="warnText">Subcontractor rows incomplete:</span> '+missingSub+' row(s).' : '<span class="okText">Subcontractor rows appear populated.</span>'}</p>`);
-  html.push(`<p>${missingRates ? '<span class="warnText">Hourly rate rows incomplete:</span> '+missingRates+' row(s).' : '<span class="okText">Hourly rate rows appear populated.</span>'}</p>`);
-  return {summaryHtml:html.join(''), detailHtml:`<div class="callout">${html.join('')}</div>`};
-}
-function runQA(){ renderQA(); alert('QA checks refreshed.'); }
-function renderExport(){
-  document.getElementById('export').innerHTML = `<div class="panel"><h2>Compile & Export</h2><p class="helptext">Exports are for internal drafting and final proposal QA. Town-facing exports remove most internal instructions and should still be reviewed before upload.</p><label><input type="checkbox" id="includeInternalMarkers"> Include internal markers/action notes in section exports</label><div class="toolbar"><button onclick="exportAllSections()">Export clean Section 1–5 documents</button><button onclick="exportPartner('hce')">Export all HCE inputs</button><button onclick="exportPartner('mies')">Export all MIES inputs</button><button onclick="exportPartner('mantle')">Export all Mantle inputs</button><button onclick="exportPartner(state.selectedRole)">Export selected partner input pack</button><button onclick="exportInternalMaster()">Export stitched internal master</button><button onclick="exportPortalSummary()">Export portal field summary</button><button onclick="exportQA()">Export QA report</button><button onclick="exportJson()">Export JSON backup</button></div><div class="callout warn">Before final upload: render PDFs, run accessibility checks, run addenda/deadline check, run portal dry-run, and confirm no pricing appears in Sections 1–5.</div></div>${submissionPanel('export')}`;
-}
-function cleanInternalTags(t){
-  if(document.getElementById('includeInternalMarkers')?.checked) return t;
-  return String(t||'')
-    .replace(/\[HCE \| REQUIRED BEFORE FINAL:([^\]]+)\]/g,'[TO BE CONFIRMED: HCE approval required.]')
-    .replace(/\[UNASSIGNED \/ HCE TO CONFIRM:([^\]]+)\]/g,'[TO BE CONFIRMED:$1]')
-    .replace(/\[PROPOSAL-FACING DRAFT\]\s*/g,'')
-    .replace(/\[REQUIRED BEFORE FINAL:([^\]]+)\]/g,'[TO BE CONFIRMED:$1]');
-}
-function sectionHtml(s){
-  return `<h1>${escapeHtml(s.title)}</h1><h2>Purpose of this section</h2><p>${escapeHtml(s.purpose)}</p><h2>Key evidence provided</h2><p>${escapeHtml(s.evidence)}</p><h2>Primary team responsibilities</h2><p>${escapeHtml(s.responsibilities)}</p><h2>How this supports the Town’s CES Study</h2><p>${escapeHtml(s.support)}</p><h2>Response</h2>${paragraphs(cleanInternalTags(s.body))}`;
-}
+function renderQA(){ const scan = scanAll(); document.getElementById('qa').innerHTML = `<div class="panel"><h2>QA / Readiness</h2>${scan.detailHtml}<h3>Unassigned / TBC Risks</h3>${state.unassignedRisks.map(r=>`<div class="callout warn"><strong>${escapeHtml(r.id)}:</strong> ${escapeHtml(r.risk)}<br><span>Status: ${escapeHtml(r.status)}</span></div>`).join('')}</div>`; }
+function scanAll(){ const technical = Object.values(state.sections).map(s=>s.title+'\n'+s.body+'\n'+s.purpose+'\n'+s.evidence).join('\n'); const feeTerms = ['hourly rate','hourly rates','fee','fees','price','pricing','lump sum','dollar amount']; const fHits = feeTerms.filter(t => new RegExp(t,'i').test(technical)); const subPct = totalSubPct(); const html = []; html.push(`<p>${fHits.length ? '<span class="warnText">Potential fee/pricing terms found in technical sections:</span> '+fHits.map(escapeHtml).join(', ') : '<span class="okText">No fee/pricing terms found in technical sections.</span>'}</p>`); html.push(`<p>${subPct >= 50 ? '<span class="dangerText">Subcontractor percentage is at/above 50%.</span>' : '<span class="okText">Subcontractor percentage below 50% based on entered percentages.</span>'} Current total: ${subPct.toFixed(1)}%.</p>`); return {summaryHtml:html.join(''), detailHtml:`<div class="callout">${html.join('')}</div>`}; }
+function renderExport(){ document.getElementById('export').innerHTML = `<div class="panel"><h2>Compile & Export</h2><div class="toolbar"><button onclick="exportAllSections()">Export clean Section 1–5 documents</button><button onclick="exportJson()">Export JSON backup</button></div></div>${submissionPanel()}`; }
+function cleanInternalTags(t){ return String(t||'').replace(/\[PROPOSAL-FACING DRAFT\]\s*/g,''); }
+function sectionHtml(s){ return `<h1>${escapeHtml(s.title)}</h1><h2>Purpose of this section</h2><p>${escapeHtml(s.purpose)}</p><h2>Response</h2>${paragraphs(cleanInternalTags(s.body))}`; }
 function paragraphs(t){ return String(t||'').split(/\n(2,)/).map(p=>`<p>${escapeHtml(p).replace(/\n/g,'<br>')}</p>`).join(''); }
 function exportSection(k){ const s=state.sections[k]; download(`${s.filename}.doc`, wordHtml(s.title, sectionHtml(s)), 'application/msword'); }
 function exportAllSections(){ Object.keys(state.sections).forEach(k=>exportSection(k)); }
-function partnerPackHtml(role){ const fields=state.partnerFields.filter(f=>role==='all'||ownerMatches(f.owners,role)); return `<h1>${escapeHtml(state.roles[role]?.label || 'Selected Partner')} Input Pack</h1>${fields.map(f=>`<h2>${escapeHtml(f.label)}</h2><p><strong>Owners:</strong> ${escapeHtml((f.owners||[]).join(', '))}<br><strong>Status:</strong> ${escapeHtml(f.status)}<br><strong>Source:</strong> ${escapeHtml(f.source)}</p>${paragraphs(f.text)}`).join('')}`; }
-function exportPartner(role){ if(role==='all') role='all'; download(`Caledon_CES_RFP_${role}_Input_Pack.doc`, wordHtml('Partner Input Pack', partnerPackHtml(role)), 'application/msword'); }
-function allSectionsHtml(){ return `<div class="cover"><h1>Caledon CES RFP — Internal Stitched Master</h1><p>Internal workspace export. Not for Town submission unless cleaned and QA-approved.</p></div>${Object.values(state.sections).map(sectionHtml).join('<hr>')}`; }
-function exportInternalMaster(){ download('Caledon_CES_RFP_Internal_Stitched_Master.doc', wordHtml('Internal Stitched Master', allSectionsHtml()), 'application/msword'); }
-function exportPortalSummary(){ download('Caledon_CES_RFP_Portal_Field_Summary.doc', wordHtml('Portal Field Summary', portalSummaryHtml()), 'application/msword'); }
-function portalSummaryHtml(){ return `<h1>Portal Field Summary</h1>${Object.entries(state.portalForms).map(([k,rows])=>`<h2>${escapeHtml(formTitle(k))}</h2>${arrayTable(rows)}`).join('')}`; }
-function exportQA(){ download('Caledon_CES_RFP_QA_Report.doc', wordHtml('QA Report', `<h1>QA Report</h1>${scanAll().detailHtml}<h2>Unassigned Risks</h2>${arrayTable(state.unassignedRisks)}`), 'application/msword'); }
 function exportJson(){ download('Caledon_CES_RFP_Partner_Workspace_Backup_v03.json', JSON.stringify(state,null,2), 'application/json'); }
-function renderBackup(){ document.getElementById('backup').innerHTML = `${submissionPanel('backup')}<div class="panel"><h2>Backup / Import</h2><p>Work is saved locally in this browser. Use JSON backup to transfer or archive progress.</p><div class="toolbar"><button onclick="exportJson()">Export JSON Backup</button><label class="btn secondary">Import JSON Backup<input type="file" accept="application/json" onchange="importBackup(event)" style="display:none"></label><button class="red" onclick="resetAll()">Reset all to v0.3 defaults</button></div></div>${coordinatorImportPanel()}`; }
+function renderBackup(){ document.getElementById('backup').innerHTML = `${submissionPanel()}<div class="panel"><h2>Backup / Import</h2><p>Work is saved locally in this browser. Use JSON backup to transfer or archive progress.</p><div class="toolbar"><button onclick="exportJson()">Export JSON Backup</button><label class="btn secondary">Import JSON Backup<input type="file" accept="application/json" onchange="importBackup(event)" style="display:none"></label><button class="red" onclick="resetAll()">Reset all to v0.3 defaults</button></div></div>${coordinatorImportPanel()}`; }
 function importBackup(event){ const file=event.target.files[0]; if(!file) return; const reader=new FileReader(); reader.onload=()=>{ try{ state=deepMerge(structuredCloneSafe(DEFAULT_DATA), JSON.parse(reader.result)); saveState(); renderAll(); alert('Backup imported.'); } catch(e){ alert('Import failed: invalid JSON.'); } }; reader.readAsText(file); }
-function renderHelp(){ document.getElementById('help').innerHTML = `<div class="panel"><h2>Help</h2><h3>How to use this workspace</h3><ol><li>Select your role on the Dashboard.</li><li>Open My Focus to see your assigned sections and missing inputs.</li><li>Edit your Partner Workspace fields and relevant upload sections.</li><li>Mark completed fields Ready for QA.</li><li>Run QA checks.</li><li>Use Save locally while working.</li><li>Use Submit to Coordinator after Glen configures the Google Apps Script endpoint.</li><li>Export your JSON backup as the portable fallback.</li></ol><div class="callout"><strong>Confirmed partners:</strong> HCE, MIES and Mantle. GIS/platform and separate DE/CES specialist are unassigned/TBC risks only.</div><h3>Submission notes</h3><ul><li>Local save stays in the user’s browser.</li><li>Submit to Coordinator sends a copy to the configured Google Sheet.</li><li>JSON backup is the portable fallback.</li><li>GitHub Pages hosts the page but does not store submissions.</li><li>The Google Sheet is the central response log after setup.</li></ul><h3>Export notes</h3><p>Section exports are Word-compatible .doc files. They are drafting outputs and should still be QA-reviewed, rendered to PDF, checked for accessibility, checked for addenda, and reviewed against the live portal before upload.</p></div>`; }
-function wordHtml(title,body){ return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>body{font-family:Arial,sans-serif;line-height:1.45;color:#111827} h1{color:#0b3558} h2{color:#1f5d8f;border-bottom:1px solid #d7dde8;padding-bottom:4px} table{border-collapse:collapse;width:100%;margin:10px 0} th,td{border:1px solid #cdd5df;padding:7px;vertical-align:top} th{background:#eef2f7} .cover{page-break-after:always;margin-top:60px}</style></head><body>${body}</body></html>`; }
-function arrayTable(arr){ if(!arr||!arr.length) return '<p>No rows.</p>'; const cols=Object.keys(arr[0]); return `<table><thead><tr>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${arr.map(r=>`<tr>${cols.map(c=>`<td>${escapeHtml(Array.isArray(r[c])?r[c].join(', '):(r[c]??''))}</td>`).join('')}</tr>`).join('')}</tbody></table>`; }
+function renderHelp(){ document.getElementById('help').innerHTML = `<div class="panel"><h2>Help</h2><ol><li>Select your role on the Dashboard.</li><li>Use Submit to Coordinator when ready.</li><li>Export JSON backup as the portable fallback.</li></ol><div class="callout"><strong>Confirmed partners:</strong> HCE, MIES and Mantle. GIS/platform and separate DE/CES specialist are unassigned/TBC risks only.</div></div>`; }
+function wordHtml(title,body){ return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>body{font-family:Arial,sans-serif;line-height:1.45;color:#111827} h1{color:#0b3558} h2{color:#1f5d8f;border-bottom:1px solid #d7dde8;padding-bottom:4px}</style></head><body>${body}</body></html>`; }
 function download(filename, content, type='text/html'){ const blob=new Blob([content],{type}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); }
 function copyToClipboard(text){ navigator.clipboard.writeText(text||'').then(()=>alert('Copied to clipboard.')).catch(()=>alert('Copy failed.')); }
 function updateDynamicMetrics(){ document.getElementById('currentRolePill').textContent='Role: '+currentRoleLabel(); updateCounters(); }
 function renderAll(){ renderDashboard(); renderFocus(); renderSections(); renderPartners(); renderForms(); renderPricing(); renderQA(); renderExport(); renderSubmission(); renderBackup(); renderHelp(); updateDynamicMetrics(); }
-navInit();
-renderAll();
+navInit(); renderAll();
 </script>
 </body>
 </html>
