@@ -1,0 +1,1 @@
+Trigger GitHub Actions workflow to link HOW_TO_GUIDE.html from the main app help tab.
