@@ -1,0 +1,37 @@
+name: Link How-To Guide
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-index:
+    if: ${{ !contains(github.event.head_commit.message, 'Link how-to guide from main app') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch main app help link only
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text()
+          s = s.replace('<button data-view="help">❔ Help</button>', '<button data-view="help">❔ How-To Guide</button>')
+          start = s.index('function renderHelp(){')
+          end = s.index('\nfunction wordHtml', start)
+          new_func = '''function renderHelp(){ document.getElementById('help').innerHTML = `<div class="panel"><h2>How-To Guide</h2><div class="callout ok"><strong>Partner guide:</strong> Open the full plain-English guide for partner roles, the 7-step workflow, what goes where, quality rules, coordinator checklist and troubleshooting.<br><br><a class="btn" href="HOW_TO_GUIDE.html" target="_blank" rel="noopener">Open full How-To Guide</a></div><h3>Quick workflow</h3><ol><li>Select your role on the Dashboard.</li><li>Open My Focus to see your assigned sections and missing inputs.</li><li>Edit your Partner Workspace fields and relevant upload sections.</li><li>Keep pricing out of Sections 1–5.</li><li>Run QA checks.</li><li>Submit to Coordinator when ready.</li><li>Export your JSON backup as the portable fallback.</li></ol><div class="callout"><strong>Confirmed partners:</strong> HCE, MIES and Mantle. GIS/platform and separate DE/CES specialist are unassigned/TBC risks only.</div><h3>Submission notes</h3><ul><li>Local save stays in the user’s browser.</li><li>Submit to Coordinator sends a copy to the configured Google Sheet.</li><li>JSON backup is the portable fallback.</li><li>GitHub Pages hosts the page but does not store submissions.</li><li>The Google Sheet is the central response log after setup.</li></ul></div>`; }'''
+          s = s[:start] + new_func + s[end:]
+          p.write_text(s)
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && exit 0
+          git commit -m "Link how-to guide from main app"
+          git push
