@@ -123,6 +123,7 @@ const DEFAULT_DATA = {
   "selectedRole": "all",
   "lastSaved": "",
   "lastSubmittedAt": "",
+  "importReceipts": [],
   "submission": {
     "reviewerName": "",
     "reviewerEmail": "",
@@ -811,6 +812,9 @@ let state = loadState();
 let selectedSection = 's1';
 let selectedWorkspaceRole = 'hce';
 let selectedForm = 'bidSubmission';
+let pendingImportDiff = null;
+let pendingImportPreviewTarget = 'backup';
+let lastImportBackup = null;
 
 function structuredCloneSafe(obj){ return JSON.parse(JSON.stringify(obj)); }
 function deepMerge(target, source){
@@ -839,10 +843,20 @@ function roleKey(label){
   const x = String(label||'').toLowerCase();
   if(x.includes('hce')) return 'hce'; if(x.includes('mies')) return 'mies'; if(x.includes('mantle')) return 'mantle'; if(x.includes('bid')||x.includes('commercial')||x.includes('compliance')) return 'bid'; if(x.includes('shared')) return 'shared'; return 'tbc';
 }
+function roleLabelForKey(role){ return ({hce:'HCE',mies:'MIES',mantle:'Mantle',bid:'Bid/Compliance',shared:'Shared',tbc:'TBC'})[roleKey(role)] || String(role||'TBC'); }
 function ownerMatches(owners, role){
   if(role === 'all') return true;
   owners = Array.isArray(owners) ? owners : [owners];
   return owners.some(o => roleKey(o) === role || roleKey(o) === 'shared');
+}
+function portalRowBelongsToRole(formKey,row,role){
+  const r = roleKey(role);
+  if(r === 'all') return true;
+  if(formKey === 'bidSubmission') return r === 'bid';
+  if(formKey === 'pricing' || formKey === 'addenda') return r === 'bid';
+  if(['hourly','references','subcontractors'].includes(formKey)) return roleKey(row.partner || row.owner || row.lead || row.company) === r;
+  if(row.owner) return ownerMatches(row.owner,r);
+  return false;
 }
 function ownerChips(owners){
   owners = Array.isArray(owners) ? owners : [owners];
@@ -952,7 +966,7 @@ function laneState(role){
   const partnerFields = (state.partnerFields||[]).filter(f=>ownerMatches(f.owners, normalized));
   const portalForms = {};
   Object.entries(state.portalForms||{}).forEach(([key,rows])=>{
-    portalForms[key] = (rows||[]).filter(r => !r.owner || ownerMatches(r.owner, normalized) || normalized==='all');
+    portalForms[key] = (rows||[]).filter(r => portalRowBelongsToRole(key,r,normalized));
   });
   return {
     role: normalized,
@@ -1014,42 +1028,194 @@ async function submitToCoordinator(){
     alert('Submission failed. Local save still exists. Export a JSON backup as fallback.\n\nError: '+err.message);
   }
 }
-function coordinatorImportPanel(){
+function coordinatorImportPanel(context='backup'){
   const mode=state.submission?.importMergeMode||'append';
-  return `<div class="panel"><h2>Coordinator Import Helper</h2><p class="helptext">Paste a submitted JSON payload from the Google Sheet or a partner JSON backup, then merge it into this workspace. This is intended for Glen / bid manager use.</p>
-    <div class="grid two"><div><label>Merge mode</label><select data-path="submission.importMergeMode"><option value="keep" ${mode==='keep'?'selected':''}>keep</option><option value="replace" ${mode==='replace'?'selected':''}>replace</option><option value="append" ${mode==='append'?'selected':''}>append</option></select></div><div><label>What merge modes mean</label><p class="muted">keep = do not overwrite current content; replace = imported content replaces matching IDs; append = imported content is appended as notes where possible.</p></div></div>
-    <label>Paste submitted JSON</label><textarea id="coordinatorImportJson" class="medium" placeholder="Paste payload JSON from Google Sheet or partner backup here."></textarea>
-    <div class="toolbar"><button onclick="importSubmittedJson()">Import / Merge Submitted JSON</button></div>
-  </div>`;
+  const receipts = (state.importReceipts||[]).slice(-3).reverse();
+  return `<div class="panel"><h2>Coordinator Import Helper</h2><p class="helptext">Paste a submitted JSON payload from the Google Sheet or a partner JSON backup. Lane-scoped imports preview safe changes first and protect unrelated partner data by default.</p>
+    <div class="grid two"><div><label>Merge mode</label><select data-path="submission.importMergeMode"><option value="keep" ${mode==='keep'?'selected':''}>keep</option><option value="replace" ${mode==='replace'?'selected':''}>replace</option><option value="append" ${mode==='append'?'selected':''}>append</option></select></div><div><label>What merge modes mean</label><p class="muted">append = lane-safe default; replace = full restore only when an explicit full workspace payload is confirmed; keep = preview only.</p></div></div>
+    <label>Paste submitted JSON</label><textarea id="coordinatorImportJson-${context}" class="medium coordinator-import-json" placeholder="Paste payload JSON from Google Sheet or partner backup here."></textarea>
+    <div class="toolbar"><button onclick="importSubmittedJson('${context}')">Preview Import Diff</button>${lastImportBackup?'<button class="secondary" onclick="undoLastImport()">Undo last import</button>':''}</div>
+    <div id="importPreview-${context}"></div>
+    ${receipts.length?`<h3>Recent import receipts</h3>${receipts.map(importReceiptHtml).join('')}`:''}
+	  </div>`;
 }
-function importSubmittedJson(){
-  const raw=document.getElementById('coordinatorImportJson')?.value||'';
+function importSubmittedJson(context='backup'){
+  const raw=document.getElementById(`coordinatorImportJson-${context}`)?.value||'';
   if(!raw.trim()){ alert('Paste submitted JSON first.'); return; }
   let payload; try{ payload=JSON.parse(raw); } catch(e){ alert('Invalid JSON.'); return; }
-  const meta = payload.reviewerName ? `${payload.reviewerName} (${payload.organization||'organization unknown'}, ${payload.role||'role unknown'})` : 'submitted payload';
-  if(!confirm(`Import ${meta}? Existing content will be handled using merge mode: ${state.submission.importMergeMode}.`)) return;
-  const mode=state.submission.importMergeMode||'append';
-  const source = payload.fullState || payload.laneState || payload;
-  if(mode==='keep'){ alert('Merge mode is keep. No current content was overwritten.'); return; }
-  if(mode==='replace' && payload.fullState){ state=deepMerge(structuredCloneSafe(DEFAULT_DATA), payload.fullState); saveState(); renderAll(); alert('Full workspace replaced from submitted payload.'); return; }
-  const incomingFields = source.partnerFields || payload.partnerInputs || [];
-  incomingFields.forEach(f=>{
-    const idx=(state.partnerFields||[]).findIndex(x=>x.id===f.id);
-    if(idx>=0){
-      if(mode==='replace') state.partnerFields[idx]=deepMerge(state.partnerFields[idx], f);
-      else if(mode==='append') state.partnerFields[idx].text = `${state.partnerFields[idx].text||''}\n\n[Imported from ${meta} at ${new Date().toLocaleString()}]\n${f.text||''}`;
-    } else state.partnerFields.push(f);
-  });
-  const incomingSections = source.sections || {};
-  Object.entries(incomingSections).forEach(([k,s])=>{
-    if(state.sections[k]){
-      if(mode==='replace') state.sections[k]=deepMerge(state.sections[k], s);
-      else if(mode==='append') state.sections[k].body = `${state.sections[k].body||''}\n\n[Imported from ${meta} at ${new Date().toLocaleString()}]\n${s.body||''}`;
-    } else state.sections[k]=s;
-  });
-  saveState(); renderAll(); alert('Partner submission imported. Review appended/replaced content before compiling.');
+  pendingImportPreviewTarget = context;
+  pendingImportDiff = buildImportDiff(state,payload,{mode:state.submission.importMergeMode||'append', filename:'pasted JSON'});
+  renderImportPreview();
 }
-function renderSubmission(){ document.getElementById('submission').innerHTML = submissionPanel('submission') + coordinatorImportPanel(); }
+function detectImportRole(payload){ return roleKey(payload?.role || payload?.submission?.role || payload?.laneState?.role || payload?.selectedRole || payload?.submission?.lastSubmissionRole || 'tbc'); }
+function getImportMode(payload){ return state.submission?.importMergeMode || payload?.submission?.importMergeMode || 'append'; }
+function isLaneScopedImport(payload){ return payload?.payloadScope === 'lane' || payload?.submission?.payloadScope === 'lane' || !!payload?.laneState || !!payload?.partnerInputs; }
+function readinessRank(status){ const s=String(status||'').toLowerCase(); if(s.includes('final')) return 3; if(s.includes('ready')) return 2; if(s.includes('draft')||s.includes('partner review')) return 1; return 0; }
+function isReadinessDowngrade(currentStatus,incomingStatus){ return readinessRank(currentStatus) > readinessRank(incomingStatus); }
+function isPlaceholderValue(value){
+  const s = String(value ?? '').trim();
+  if(!s) return true;
+  return /^(\[TO BE CONFIRMED|\[REQUIRED BEFORE FINAL|TBC$|To be confirmed$)/i.test(s);
+}
+function meaningfulValue(value){ return !isPlaceholderValue(value); }
+function fieldBelongsToRole(field,role){
+  const r = roleKey(role);
+  if(r === 'all') return true;
+  if(String(field.id||'').toLowerCase().startsWith(r+'-')) return true;
+  const owners = Array.isArray(field.owners) ? field.owners : [field.owners];
+  return owners.length === 1 && roleKey(owners[0]) === r;
+}
+function importSource(payload){
+  if(payload?.laneState) return payload.laneState;
+  if(payload?.fullState) return payload.fullState;
+  return payload || {};
+}
+function importMeta(payload){
+  const role = detectImportRole(payload);
+  return {
+    role,
+    roleLabel: roleLabelForKey(role),
+    reviewerName: payload?.reviewerName || payload?.submission?.reviewerName || '',
+    reviewerEmail: payload?.reviewerEmail || payload?.submission?.reviewerEmail || '',
+    submissionId: payload?.submissionId || payload?.submission?.lastSubmissionId || '',
+    payloadScope: payload?.payloadScope || payload?.submission?.payloadScope || (payload?.laneState?'lane':'workspace')
+  };
+}
+function buildImportDiff(currentState,payload,options={}){
+  const meta = importMeta(payload);
+  const mode = options.mode || getImportMode(payload);
+  const laneScoped = isLaneScopedImport(payload) || meta.payloadScope === 'lane';
+  const source = importSource(payload);
+  const diff = {id:`import-${Date.now()}`, filename:options.filename||'pasted JSON', payload, mode, laneScoped, meta, safe:[], conflicts:[], skipped:[], summary:{}};
+  if(mode === 'keep'){ diff.skipped.push(importAction('workspace','workspace','Preview only','Merge mode is keep; no changes will be applied.')); return summarizeImportDiff(diff); }
+  if(mode === 'replace' && payload.fullState && !laneScoped){
+    diff.conflicts.push({id:'full-restore', type:'fullRestore', label:'Full workspace restore', reason:'Explicit full restore from backup', current:'current workspace', incoming:'incoming fullState'});
+    return summarizeImportDiff(diff);
+  }
+  collectPartnerFieldDiff(diff,currentState,source,meta,mode);
+  collectSectionDiff(diff,currentState,source);
+  collectPortalFormDiff(diff,currentState,source,meta,mode);
+  return summarizeImportDiff(diff);
+}
+function importAction(type,targetId,label,reason,extra={}){ return {id:`${type}:${targetId}:${extra.field||''}:${extra.form||''}`.replace(/[^a-zA-Z0-9:_-]/g,'_'),type,targetId,label,reason,...extra}; }
+function summarizeImportDiff(diff){
+  diff.summary = {safe:diff.safe.length, conflicts:diff.conflicts.length, skipped:diff.skipped.length, added:diff.safe.filter(a=>a.changeType==='add').length, updated:diff.safe.filter(a=>a.changeType==='update').length};
+  return diff;
+}
+function incomingPartnerFields(source,payload){ return (Array.isArray(payload?.partnerInputs) && payload.partnerInputs.length ? payload.partnerInputs : source.partnerFields) || []; }
+function collectPartnerFieldDiff(diff,currentState,source,meta,mode){
+  incomingPartnerFields(source,diff.payload).forEach(incoming=>{
+    const current = (currentState.partnerFields||[]).find(f=>f.id===incoming.id);
+    if(!fieldBelongsToRole(current||incoming,meta.role)){ diff.skipped.push(importAction('partnerField',incoming.id||'unknown',incoming.label||incoming.id,'Different lane / ownership')); return; }
+    if(!current){ diff.safe.push(importAction('partnerField',incoming.id,incoming.label||incoming.id,'New partner field',{changeType:'add',incoming})); return; }
+    const changes = [];
+    const conflicts = [];
+    if(incoming.status && incoming.status !== current.status){
+      if(isReadinessDowngrade(current.status,incoming.status)) conflicts.push({field:'status',reason:'Readiness downgrade blocked',current:current.status,incoming:incoming.status});
+      else changes.push({field:'status',value:incoming.status,mode:'set'});
+    }
+    if('text' in incoming && incoming.text !== current.text){
+      if(meaningfulValue(current.text) && isPlaceholderValue(incoming.text)) conflicts.push({field:'text',reason:'Placeholder would overwrite meaningful text',current:current.text,incoming:incoming.text});
+      else if(mode === 'append' && meaningfulValue(incoming.text) && !String(current.text||'').includes(String(incoming.text||''))) changes.push({field:'text',value:incoming.text,mode:'append'});
+      else if(mode !== 'append' && meaningfulValue(incoming.text)) changes.push({field:'text',value:incoming.text,mode:'set'});
+    }
+    if(changes.length) diff.safe.push(importAction('partnerField',incoming.id,incoming.label||incoming.id,'Lane-safe partner field update',{changeType:'update',changes,incoming}));
+    conflicts.forEach(c=>diff.conflicts.push(importAction('partnerField',incoming.id,incoming.label||incoming.id,c.reason,{changeType:'conflict',conflict:c,incoming})));
+    if(!changes.length && !conflicts.length) diff.skipped.push(importAction('partnerField',incoming.id,incoming.label||incoming.id,'No meaningful change'));
+  });
+}
+function collectSectionDiff(diff,currentState,source){
+  Object.entries(source.sections||{}).forEach(([key,s])=>{
+    diff.skipped.push(importAction('section',key,s.title||key,'Shared proposal sections are skipped during lane import by default.'));
+  });
+}
+function portalRowKey(form,row,index){ return row.id || row.ref || row.role || row.company || row.item || row.line || `${form}-${index}`; }
+function findPortalRowIndex(rows,form,incoming,index){
+  if(['hourly'].includes(form)) return rows.findIndex(r=>r.partner===incoming.partner && r.role===incoming.role);
+  if(['references'].includes(form)) return rows.findIndex(r=>roleKey(r.partner)===roleKey(incoming.partner) && (r.ref===incoming.ref || r.projectName===incoming.projectName || r.project===incoming.project));
+  if(['subcontractors'].includes(form)) return rows.findIndex(r=>roleKey(r.partner)===roleKey(incoming.partner) && r.company===incoming.company);
+  return index < rows.length ? index : -1;
+}
+function collectPortalFormDiff(diff,currentState,source,meta,mode){
+  Object.entries(source.portalForms||{}).forEach(([form,rows])=>{
+    (rows||[]).forEach((incoming,index)=>{
+      const label = `${form} / ${portalRowKey(form,incoming,index)}`;
+      if(!portalRowBelongsToRole(form,incoming,meta.role)){ diff.skipped.push(importAction('portalRow',label,label,'Portal row belongs to another lane or is protected',{form})); return; }
+      const currentRows = currentState.portalForms?.[form] || [];
+      const rowIndex = findPortalRowIndex(currentRows,form,incoming,index);
+      if(rowIndex < 0){ diff.safe.push(importAction('portalRow',label,label,'New lane-owned portal row',{changeType:'add',form,incoming})); return; }
+      const current = currentRows[rowIndex];
+      const changes = [];
+      Object.keys(incoming).forEach(field=>{
+        if(JSON.stringify(incoming[field]) === JSON.stringify(current[field])) return;
+        if(meaningfulValue(current[field]) && isPlaceholderValue(incoming[field])) return diff.conflicts.push(importAction('portalRow',label,label,'Placeholder would overwrite meaningful portal value',{form,rowIndex,field,incomingValue:incoming[field]}));
+        if(field === 'status' && isReadinessDowngrade(current.status,incoming.status)) return diff.conflicts.push(importAction('portalRow',label,label,'Readiness downgrade blocked',{form,rowIndex,field,incomingValue:incoming[field]}));
+        changes.push({field,value:incoming[field],mode:'set'});
+      });
+      if(changes.length) diff.safe.push(importAction('portalRow',label,label,'Lane-owned portal row update',{changeType:'update',form,rowIndex,changes,incoming}));
+      else diff.skipped.push(importAction('portalRow',label,label,'No meaningful portal row change',{form}));
+    });
+  });
+}
+function renderImportPreview(){
+  const el=document.getElementById(`importPreview-${pendingImportPreviewTarget}`);
+  if(!el || !pendingImportDiff) return;
+  const d=pendingImportDiff, s=d.summary;
+  el.innerHTML = `<div class="callout"><strong>Import preview:</strong> ${escapeHtml(d.meta.roleLabel)} · ${escapeHtml(d.meta.reviewerName||'reviewer unknown')} · ${escapeHtml(d.mode)} mode<br>Safe changes: ${s.safe}; conflicts: ${s.conflicts}; skipped: ${s.skipped}</div>
+    ${importPreviewGroup('Safe changes',d.safe,false)}
+    ${importPreviewGroup('Conflicts requiring confirmation',d.conflicts,true)}
+    ${importPreviewGroup('Skipped',d.skipped,false)}
+    <div class="toolbar"><button onclick="applyPendingImport(false)">Apply safe changes only</button><button class="secondary" onclick="applyPendingImport(true)">Apply safe changes + selected conflicts</button><button class="red" onclick="cancelPendingImport()">Cancel import</button></div>`;
+}
+function importPreviewGroup(title,items,selectable){
+  if(!items.length) return '';
+  return `<h3>${escapeHtml(title)}</h3><div class="table-wrap"><table><thead><tr>${selectable?'<th>Apply?</th>':''}<th>Target</th><th>Reason</th></tr></thead><tbody>${items.map((a,i)=>`<tr>${selectable?`<td><input type="checkbox" class="import-conflict" value="${i}" style="width:auto"></td>`:''}<td>${escapeHtml(a.label||a.targetId)}</td><td>${escapeHtml(a.reason||'')}</td></tr>`).join('')}</tbody></table></div>`;
+}
+function cancelPendingImport(){ pendingImportDiff=null; const el=document.getElementById(`importPreview-${pendingImportPreviewTarget}`); if(el) el.innerHTML='<div class="callout warn">Import cancelled. No changes applied.</div>'; }
+function applyPendingImport(includeSelectedConflicts=false){
+  if(!pendingImportDiff){ alert('No pending import preview.'); return; }
+  if(!confirm('Apply the previewed import changes? A temporary undo backup will be kept in this browser session.')) return;
+  const selected = includeSelectedConflicts ? [...document.querySelectorAll('.import-conflict:checked')].map(i=>parseInt(i.value,10)) : [];
+  lastImportBackup = structuredCloneSafe(state);
+  const applied = [];
+  pendingImportDiff.safe.forEach(a=>{ if(applyImportAction(a)){ applied.push(a); } });
+  selected.forEach(i=>{ const a=pendingImportDiff.conflicts[i]; if(a && applyImportAction(a,true)){ applied.push(a); } });
+  const receipt = createImportReceipt(pendingImportDiff,applied,selected);
+  state.importReceipts = state.importReceipts || [];
+  state.importReceipts.push(receipt);
+  state.submission.lastSubmissionRole = pendingImportDiff.meta.roleLabel;
+  state.submission.lastSubmissionId = pendingImportDiff.meta.submissionId || receipt.id;
+  state.submission.lastSubmissionMessage = `Imported ${receipt.counts.applied} safe lane change(s); blocked ${receipt.counts.blocked} potential regression(s).`;
+  pendingImportDiff = null;
+  saveState(); renderAll(); showView('backup');
+  setTimeout(()=>{ const el=document.getElementById(`importPreview-${pendingImportPreviewTarget}`); if(el) el.innerHTML=`<div class="callout ok"><strong>Import complete.</strong> Receipt ${escapeHtml(receipt.id)} recorded. ${receipt.counts.blocked?'Potential regressions were blocked.':''}</div>`; },0);
+}
+function applyImportAction(a,force=false){
+  if(a.type === 'fullRestore' && force && pendingImportDiff.payload.fullState){ state=deepMerge(structuredCloneSafe(DEFAULT_DATA), pendingImportDiff.payload.fullState); return true; }
+  if(a.type === 'partnerField'){
+    if(a.changeType === 'add' && a.incoming){ state.partnerFields.push(a.incoming); return true; }
+    const f=(state.partnerFields||[]).find(x=>x.id===a.targetId); if(!f) return false;
+    if(force && a.conflict){ f[a.conflict.field]=a.conflict.incoming; return true; }
+    (a.changes||[]).forEach(c=>{ f[c.field] = c.mode==='append' ? `${f[c.field]||''}\n\n[Imported ${new Date().toLocaleString()}]\n${c.value}` : c.value; });
+    return true;
+  }
+  if(a.type === 'portalRow'){
+    const rows=state.portalForms[a.form] || (state.portalForms[a.form]=[]);
+    if(a.changeType === 'add' && a.incoming){ rows.push(a.incoming); return true; }
+    const row=rows[a.rowIndex]; if(!row) return false;
+    if(force && a.field){ row[a.field]=a.incomingValue; return true; }
+    (a.changes||[]).forEach(c=>row[c.field]=c.value);
+    return true;
+  }
+  return false;
+}
+function createImportReceipt(diff,applied,selected){
+  const blocked = diff.conflicts.length - selected.length;
+  return {id:`IMP-${Date.now().toString(36)}`, filename:diff.filename, importedRole:diff.meta.roleLabel, reviewerName:diff.meta.reviewerName, reviewerEmail:diff.meta.reviewerEmail, submissionId:diff.meta.submissionId, timestamp:new Date().toISOString(), status:'success', counts:{applied:applied.length, safe:diff.safe.length, selectedConflicts:selected.length, skipped:diff.skipped.length, blocked}, changed:applied.map(a=>a.targetId), skipped:diff.skipped.map(a=>({target:a.targetId,reason:a.reason})), conflicts:diff.conflicts.map(a=>({target:a.targetId,reason:a.reason})), warning:blocked?'Potential regression(s) blocked by lane-safe import rules.':''};
+}
+function importReceiptHtml(r){ return `<div class="callout ${r.warning?'warn':'ok'}"><strong>${escapeHtml(r.id)}</strong> · ${escapeHtml(r.importedRole)} · ${escapeHtml(r.timestamp)}<br>Reviewer: ${escapeHtml(r.reviewerName||'—')} ${escapeHtml(r.reviewerEmail||'')}<br>Applied: ${r.counts?.applied||0}; skipped: ${r.counts?.skipped||0}; blocked: ${r.counts?.blocked||0}${r.warning?`<br>${escapeHtml(r.warning)}`:''}</div>`; }
+function undoLastImport(){ if(!lastImportBackup){ alert('No import backup available in this browser session.'); return; } if(confirm('Undo the last import and restore the pre-import workspace state?')){ state=structuredCloneSafe(lastImportBackup); lastImportBackup=null; saveState(); renderAll(); alert('Last import undone.'); } }
+function renderSubmission(){ document.getElementById('submission').innerHTML = submissionPanel('submission') + coordinatorImportPanel('submission'); }
 
 function renderDashboard(){
   const st = completionStats();
@@ -1226,8 +1392,8 @@ function exportPortalSummary(){ download('Caledon_CES_RFP_Portal_Field_Summary.d
 function portalSummaryHtml(){ return `<h1>Portal Field Summary</h1>${Object.entries(state.portalForms).map(([k,rows])=>`<h2>${escapeHtml(formTitle(k))}</h2>${arrayTable(rows)}`).join('')}`; }
 function exportQA(){ download('Caledon_CES_RFP_QA_Report.doc', wordHtml('QA Report', `<h1>QA Report</h1>${scanAll().detailHtml}<h2>Unassigned Risks</h2>${arrayTable(state.unassignedRisks)}`), 'application/msword'); }
 function exportJson(){ download('Caledon_CES_RFP_Partner_Workspace_Backup_v03.json', JSON.stringify(state,null,2), 'application/json'); }
-function renderBackup(){ document.getElementById('backup').innerHTML = `${submissionPanel('backup')}<div class="panel"><h2>Backup / Import</h2><p>Work is saved locally in this browser. Use JSON backup to transfer or archive progress.</p><div class="toolbar"><button onclick="exportJson()">Export JSON Backup</button><label class="btn secondary">Import JSON Backup<input type="file" accept="application/json" onchange="importBackup(event)" style="display:none"></label><button class="red" onclick="resetAll()">Reset all to v0.3 defaults</button></div></div>${coordinatorImportPanel()}`; }
-function importBackup(event){ const file=event.target.files[0]; if(!file) return; const reader=new FileReader(); reader.onload=()=>{ try{ state=deepMerge(structuredCloneSafe(DEFAULT_DATA), JSON.parse(reader.result)); saveState(); renderAll(); alert('Backup imported.'); } catch(e){ alert('Import failed: invalid JSON.'); } }; reader.readAsText(file); }
+function renderBackup(){ document.getElementById('backup').innerHTML = `${submissionPanel('backup')}<div class="panel"><h2>Backup / Import</h2><p>Work is saved locally in this browser. Use JSON backup to transfer or archive progress.</p><div class="toolbar"><button onclick="exportJson()">Export JSON Backup</button><label class="btn secondary">Import JSON Backup<input type="file" accept="application/json" onchange="importBackup(event)" style="display:none"></label><button class="red" onclick="resetAll()">Reset all to v0.3 defaults</button></div></div>${coordinatorImportPanel('backup')}`; }
+function importBackup(event){ const file=event.target.files[0]; if(!file) return; if(!confirm('Restore this JSON backup as the full workspace? For partner lane submissions, use Coordinator Import Helper instead.')) return; const reader=new FileReader(); reader.onload=()=>{ try{ lastImportBackup=structuredCloneSafe(state); state=deepMerge(structuredCloneSafe(DEFAULT_DATA), JSON.parse(reader.result)); saveState(); renderAll(); alert('Full workspace backup restored.'); } catch(e){ alert('Import failed: invalid JSON.'); } }; reader.readAsText(file); }
 function renderHelp(){ document.getElementById('help').innerHTML = `<div class="panel"><h2>How-To Guide</h2><div class="callout ok"><strong>Partner guide:</strong> Open the full plain-English guide for partner roles, the 7-step workflow, what goes where, quality rules, coordinator checklist and troubleshooting.<br><br><a class="btn" href="HOW_TO_GUIDE.html" target="_blank" rel="noopener">Open full How-To Guide</a></div><h3>Quick workflow</h3><ol><li>Select your role on the Dashboard.</li><li>Open My Focus to see your assigned sections and missing inputs.</li><li>Edit your Partner Workspace fields and relevant upload sections.</li><li>Keep pricing out of Sections 1–5.</li><li>Run QA checks.</li><li>Submit to Coordinator when ready.</li><li>Export your JSON backup as the portable fallback.</li></ol><div class="callout"><strong>Confirmed partners:</strong> HCE, MIES and Mantle. GIS/platform and separate DE/CES specialist are unassigned/TBC risks only.</div><h3>Submission notes</h3><ul><li>Local save stays in the user’s browser.</li><li>Submit to Coordinator sends a copy to the configured Google Sheet.</li><li>JSON backup is the portable fallback.</li><li>GitHub Pages hosts the page but does not store submissions.</li><li>The Google Sheet is the central response log after setup.</li></ul></div>`; }
 function wordHtml(title,body){ return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>body{font-family:Arial,sans-serif;line-height:1.45;color:#111827} h1{color:#0b3558} h2{color:#1f5d8f;border-bottom:1px solid #d7dde8;padding-bottom:4px} table{border-collapse:collapse;width:100%;margin:10px 0} th,td{border:1px solid #cdd5df;padding:7px;vertical-align:top} th{background:#eef2f7} .cover{page-break-after:always;margin-top:60px}</style></head><body>${body}</body></html>`; }
 function arrayTable(arr){ if(!arr||!arr.length) return '<p>No rows.</p>'; const cols=Object.keys(arr[0]); return `<table><thead><tr>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${arr.map(r=>`<tr>${cols.map(c=>`<td>${escapeHtml(Array.isArray(r[c])?r[c].join(', '):(r[c]??''))}</td>`).join('')}</tr>`).join('')}</tbody></table>`; }
