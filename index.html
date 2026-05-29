@@ -46,6 +46,7 @@ main{padding:22px;max-width:1500px;width:100%;margin:0 auto}
 .callout{border-left:5px solid var(--hce);background:#f8fbff;border-radius:12px;padding:12px;margin:10px 0} .callout.warn{border-color:var(--amber);background:var(--amber-soft)} .callout.danger{border-color:var(--red);background:var(--red-soft)} .callout.ok{border-color:var(--green);background:var(--green-soft)}
 button,.btn{border:0;border-radius:11px;background:#0b4a7a;color:#fff;padding:9px 12px;font-weight:750;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
 button.secondary,.btn.secondary{background:#eef2f7;color:#344054;border:1px solid #d0d5dd} button.green{background:var(--green)} button.purple{background:var(--mantle)} button.red{background:var(--red)} button.small{padding:6px 8px;font-size:.78rem}
+button:disabled{opacity:.5;cursor:not-allowed}
 button:focus,input:focus,textarea:focus,select:focus{outline:3px solid rgba(11,74,122,.25);outline-offset:2px}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
 label{font-size:.82rem;font-weight:750;color:#344054;display:block;margin-bottom:5px}
@@ -53,6 +54,7 @@ input,textarea,select{width:100%;border:1px solid #cfd6df;border-radius:10px;pad
 textarea{min-height:92px;resize:vertical} textarea.big{min-height:340px} textarea.medium{min-height:160px}
 .field-card{border:1px solid var(--line);border-radius:16px;background:#fff;padding:14px;margin-bottom:14px}
 .field-card.hce{border-left:6px solid var(--hce)} .field-card.mies{border-left:6px solid var(--mies)} .field-card.mantle{border-left:6px solid var(--mantle)} .field-card.bid{border-left:6px solid var(--bid)} .field-card.shared{border-left:6px solid var(--shared)}
+.section-compiler{border:1px solid var(--line);border-radius:14px;background:#fbfdff;padding:14px;margin:14px 0}
 .reference-card-grid{display:grid;gap:14px}
 .pricing-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:12px 0}
 .pricing-summary .kpi{min-height:94px}
@@ -128,6 +130,22 @@ const DEFAULT_DATA = {
   "lastSaved": "",
   "lastSubmittedAt": "",
   "importReceipts": [],
+  "sectionCompiler": {
+    "lastCompiledAt": "",
+    "status": "Not compiled",
+    "warnings": [],
+    "noFeeCheck": {
+      "passed": true,
+      "findings": []
+    },
+    "compiled": {
+      "s1": {"body": "", "sourceMap": [], "warnings": [], "noFeeCheck": {"passed": true, "findings": []}},
+      "s2": {"body": "", "sourceMap": [], "warnings": [], "noFeeCheck": {"passed": true, "findings": []}},
+      "s3": {"body": "", "sourceMap": [], "warnings": [], "noFeeCheck": {"passed": true, "findings": []}},
+      "s4": {"body": "", "sourceMap": [], "warnings": [], "noFeeCheck": {"passed": true, "findings": []}},
+      "s5": {"body": "", "sourceMap": [], "warnings": [], "noFeeCheck": {"passed": true, "findings": []}}
+    }
+  },
   "submission": {
     "reviewerName": "",
     "reviewerEmail": "",
@@ -1283,7 +1301,7 @@ function renderSections(){
   if(!visible.find(([k])=>k===selectedSection) && visible.length) selectedSection = visible[0][0];
   const tabs = visible.map(([k,s]) => `<button class="${selectedSection===k?'active':''}" onclick="selectedSection='${k}'; renderSections()">${escapeHtml(s.title.replace('Section ',''))}</button>`).join('');
   const s = state.sections[selectedSection];
-  document.getElementById('sections').innerHTML = `<div class="panel"><h2>Five Upload Sections</h2><div class="callout warn"><strong>No-fee rule:</strong> Sections 1–5 must not include prices, hourly rates, task prices or fee language.</div><div class="tabs">${tabs}</div>${s?sectionEditor(selectedSection,s):'<p>No section visible for selected role.</p>'}</div>`;
+  document.getElementById('sections').innerHTML = `<div class="panel"><h2>Five Upload Sections</h2><div class="callout warn"><strong>No-fee rule:</strong> Sections 1–5 must not include prices, hourly rates, task prices or fee language.</div>${renderSectionCompilerPanel(selectedSection)}<div class="tabs">${tabs}</div>${s?sectionEditor(selectedSection,s):'<p>No section visible for selected role.</p>'}</div>`;
   updateCounters();
 }
 function sectionEditor(key,s){
@@ -1302,6 +1320,301 @@ function textareaField(label,path,value,size=''){ return `<div><label>${escapeHt
 function selectOptions(opts, selected){ return opts.map(o=>`<option ${o===selected?'selected':''}>${escapeHtml(o)}</option>`).join(''); }
 function resetSection(key){ if(confirm('Reset this section to the v0.2 pre-filled draft?')){ state.sections[key] = structuredCloneSafe(DEFAULT_DATA.sections[key]); saveState(); renderSections(); } }
 function markSectionReady(key){ state.sections[key].status='Ready for QA'; saveState(); renderSections(); renderDashboard(); }
+function sectionKeys(){ return ['s1','s2','s3','s4','s5']; }
+function ensureSectionCompiler(){
+  const d = structuredCloneSafe(DEFAULT_DATA.sectionCompiler);
+  const c = state.sectionCompiler || (state.sectionCompiler = d);
+  if(!c.compiled || typeof c.compiled !== 'object') c.compiled = {};
+  sectionKeys().forEach(k => {
+    c.compiled[k] = deepMerge(structuredCloneSafe(d.compiled[k]), c.compiled[k] || {});
+  });
+  if(!c.noFeeCheck) c.noFeeCheck = {passed:true,findings:[]};
+  if(!Array.isArray(c.warnings)) c.warnings = [];
+  return c;
+}
+function fieldById(id){ return (state.partnerFields||[]).find(f=>f.id===id) || {label:id,status:'',text:''}; }
+function fieldLine(id){
+  const f = fieldById(id);
+  const text = String(f.text||'').trim();
+  if(!text) return '';
+  return `${f.label} (${f.status || 'status TBC'}): ${text}`;
+}
+function tbcLine(label, value){
+  const v = String(value ?? '').trim();
+  return meaningfulValue(v) ? `${label}: ${v}` : `${label}: TO BE CONFIRMED`;
+}
+function referenceSummary(r,index){
+  const label = `${r.ref || `Reference ${index+1}`} - ${r.partner || 'Partner TBC'}`;
+  const bits = [
+    tbcLine('Company', r.companyName),
+    tbcLine('Reference contact', r.referenceFullName || r.contact),
+    tbcLine('Reference role/title', r.referenceRoleTitle),
+    tbcLine('Reference phone', r.referencePhoneExtension),
+    tbcLine('Reference email', r.referenceEmail),
+    tbcLine('Project', r.projectName || r.project),
+    tbcLine('Project address', r.projectAddress),
+    tbcLine('Primary consultant', r.primaryConsultant),
+    meaningfulValue(r.projectValue || r.value) ? 'Project value: confirmed in portal record; omit figure from technical upload.' : 'Project value: TO BE CONFIRMED or not disclosed',
+    tbcLine('Project dates', r.projectDates || r.dates),
+    tbcLine('Permission to cite/contact', r.permission),
+    tbcLine('Status', r.status)
+  ];
+  return `${label}\n${bits.map(b=>`- ${b}`).join('\n')}`;
+}
+function staffSummary(row){
+  const name = meaningfulValue(row.name) ? row.name : 'TO BE CONFIRMED';
+  const years = meaningfulValue(row.years) ? `; experience: ${row.years}` : '';
+  return `${row.partner || 'Partner TBC'} - ${name} - ${row.role || 'Role TBC'}${years}; status: ${row.status || 'TBC'}`;
+}
+function taskLabel(line){ const t=taskByLine(line); return `${line || 'Task TBC'} - ${t.task || 'Task name TBC'}`; }
+function allocationScheduleRows(){
+  return (ensurePricingBuild().taskAllocations||[]).map(a => {
+    const person = a.teamMemberName || a.role || 'person to be confirmed';
+    const effort = meaningfulValue(a.hours) ? 'effort entered in internal build; omit hours from upload' : 'effort to be confirmed internally';
+    return `${taskLabel(a.taskLine)} | ${a.partner || 'Partner TBC'} | ${person} | ${a.role || 'Role TBC'} | ${effort} | ${a.status || 'TBC'}${a.notes ? ` | ${a.notes}` : ''}`;
+  });
+}
+function noFeeFindings(text){
+  const checks = [
+    ['$', /\$/],
+    ['CAD', /\bCAD\b/i],
+    ['price', /\bprice\b/i],
+    ['pricing', /\bpricing\b/i],
+    ['fee', /\bfee\b/i],
+    ['fees', /\bfees\b/i],
+    ['hourly', /\bhourly\b/i],
+    ['rate', /\brate\b/i],
+    ['rates', /\brates\b/i],
+    ['labour cost', /\blabou?r cost\b/i],
+    ['task price', /\btask price\b/i],
+    ['subtotal', /\bsubtotal\b/i],
+    ['total contract', /\btotal contract\b/i],
+    ['workshare dollar value', /\bworkshare dollar value\b/i]
+  ];
+  return checks.filter(([,rx])=>rx.test(text||'')).map(([label])=>label);
+}
+function noFeeCheck(text){ const findings=[...new Set(noFeeFindings(text))]; return {passed:findings.length===0,findings}; }
+function sanitizeTechnicalText(text){
+  return String(text||'')
+    .replace(/\bRate:\s*[^,\n;]+/gi,'staff commercial detail withheld')
+    .replace(/\$\s*[\d,]+(?:\.\d+)?(?:\s*\/?\s*(?:hr|hour))?/gi,'[commercial amount removed]')
+    .replace(/\bCAD\b/gi,'Canadian')
+    .replace(/\bhourly\s+rates?\b/gi,'staffing details')
+    .replace(/\bhourly\b/gi,'staff')
+    .replace(/\brates?\b/gi,'staff details')
+    .replace(/\bpricing\b/gi,'commercial information')
+    .replace(/\bprices?\b/gi,'commercial amounts')
+    .replace(/\bfees?\b/gi,'commercial amounts')
+    .replace(/\blabou?r cost\b/gi,'staffing input')
+    .replace(/\btask price\b/gi,'task commercial amount')
+    .replace(/\bsubtotal\b/gi,'commercial subtotal')
+    .replace(/\btotal contract\b/gi,'contract')
+    .replace(/\bworkshare dollar value\b/gi,'delivery responsibility');
+}
+function compiledSection(key, body, sourceMap, warnings=[]){
+  const cleaned = sanitizeTechnicalText(body).replace(/\n{3,}/g,'\n\n').trim();
+  const check = noFeeCheck(cleaned);
+  return {body:cleaned,sourceMap,warnings:[...warnings, ...check.findings.map(f=>`No-fee sanitizer finding: ${f}`)],noFeeCheck:check};
+}
+function buildCompiledSections(){
+  const refs = state.portalForms.references || [];
+  const hourly = state.portalForms.hourly || [];
+  const subs = state.portalForms.subcontractors || [];
+  const allocations = allocationScheduleRows();
+  const taskRows = state.portalForms.pricing || [];
+  const addenda = state.portalForms.addenda || [];
+  const warningRefs = refs.filter(r => /to be confirmed|tbc|not ready/i.test(Object.values(r).join(' '))).map(r=>`${r.ref || 'Reference'} ${r.partner || ''} has incomplete portal fields.`);
+  const staffRows = hourly.map(staffSummary);
+  const subcontractorRows = subs.map(s => `${s.partner || 'Partner TBC'} - ${s.company || 'Legal entity TBC'} - ${s.type || 'Role TBC'}; conflict status: ${s.conflict || 'TBC'}; status: ${s.status || 'TBC'}`);
+  const taskMatrix = taskRows.map(t => `${t.line}: ${t.task} | lead: ${t.lead || 'lead TBC'} | status: ${t.status || 'TBC'}`);
+  return {
+    s1: compiledSection('s1', `[COMPILED DRAFT - REVIEW BEFORE UPLOAD]
+
+HCE is positioned as prime consultant, municipal operator lens and final integration lead for the Caledon Community Energy Systems Study. The compiled workspace data supports a profile centred on public-sector infrastructure discipline, practical energy implementation, quality control, utility coordination and final study integration.
+
+Prime role and governance evidence
+${fieldLine('hce-legal')}
+
+Energy and district-energy evidence
+${fieldLine('hce-energy')}
+
+Team integration and implementation role
+${fieldLine('hce-team')}
+
+Implementation and governance roadmap
+${fieldLine('hce-roadmap')}
+
+Partner integration
+MIES provides modelling, data and thermal/electric analysis support. Mantle provides CES solutions, scenario, climate policy, resilience and FCM/NZT alignment support. HCE coordinates these partner inputs into a practical implementation pathway for Town review, governance and future delivery decisions.
+
+Subcontractor and specialist role summary
+${subcontractorRows.map(r=>`- ${r}`).join('\n') || '- TO BE CONFIRMED: subcontractor role records.'}
+
+Items requiring final confirmation
+- Final legal proponent and authority-to-bind details must be verified before portal entry.
+- Any unconfirmed legal or reference claims must remain labelled TO BE CONFIRMED until approved.
+- Commercial information is intentionally excluded from this technical section.`, ['sections.s1','hce-legal','hce-energy','hce-team','hce-roadmap','portalForms.subcontractors']),
+    s2: compiledSection('s2', `[COMPILED DRAFT - REVIEW BEFORE UPLOAD]
+
+The reference package is compiled from the portal reference records and partner workspace fields. References should demonstrate municipal energy implementation, district energy and waste heat recovery, energy modelling, geospatial demand/source mapping, climate policy, CES scenario analysis and implementation readiness.
+
+Portal reference records
+${refs.map(referenceSummary).join('\n\n') || 'TO BE CONFIRMED: three portal references.'}
+
+HCE reference evidence
+${fieldLine('hce-energy')}
+
+Partner reference readiness
+- HCE reference record: ${refs.find(r=>roleKey(r.partner)==='hce')?.status || 'TBC'}.
+- MIES reference record: ${refs.find(r=>roleKey(r.partner)==='mies')?.status || 'TBC'}.
+- Mantle reference record: ${refs.find(r=>roleKey(r.partner)==='mantle')?.status || 'TBC'}.
+
+Compiler flags
+${warningRefs.length ? warningRefs.map(w=>`- ${w}`).join('\n') : '- Reference records appear populated enough for draft review.'}
+
+Before final upload, confirm permission to cite, contact details, project dates, comparability to the Town scope and whether project-value details should be omitted or stated as not disclosed.`, ['sections.s2','portalForms.references','hce-energy'], warningRefs),
+    s3: compiledSection('s3', `[COMPILED DRAFT - REVIEW BEFORE UPLOAD]
+
+The assigned project team is organized as a prime-and-specialist delivery model. HCE remains accountable for governance, Town coordination, quality control, final integration and implementation-roadmap logic. MIES supports data, modelling and thermal/electric demand analysis. Mantle supports CES solutions, scenario analysis, climate policy, resilience and FCM/NZT alignment.
+
+Partner role cards
+HCE:
+${fieldLine('hce-team')}
+
+MIES:
+${fieldLine('mies-role')}
+${fieldLine('mies-data')}
+${fieldLine('mies-thermal')}
+
+Mantle:
+${fieldLine('mantle-role')}
+${fieldLine('mantle-t1t2')}
+${fieldLine('mantle-t3')}
+${fieldLine('mantle-scenarios')}
+${fieldLine('mantle-t4t5')}
+
+Named staff and roles from portal staffing records
+${staffRows.map(r=>`- ${r}`).join('\n') || '- TO BE CONFIRMED: named staff records.'}
+
+Delivery responsibility summary from internal task allocation records
+${allocations.length ? allocations.map(r=>`- ${r}`).join('\n') : '- TO BE CONFIRMED: task/person responsibility rows have not been entered in the internal build.'}
+
+Readiness notes
+- Resume status and conflict declarations must be verified before final.
+- Unconfirmed names should remain marked TO BE CONFIRMED.
+- Commercial staffing details are intentionally excluded from this technical section.`, ['sections.s3','partnerFields','portalForms.hourly','pricingBuild.taskAllocations']),
+    s4: compiledSection('s4', `[COMPILED DRAFT - REVIEW BEFORE UPLOAD]
+
+The methodology is compiled around the Town's five-task structure: data governance, demand/source mapping, Opportunity Atlas development, solutions screening, scenario analysis, stakeholder validation, implementation governance and final reporting.
+
+Task 1 - Methodology and Data Collection
+HCE leads kickoff, governance, assumptions tracking, QA and data request control. MIES contributes data requirements, cleaning, outlier review, building archetypes, weather, electricity, natural gas, LiDAR and development assumptions. Mantle contributes policy context, CEERP/Official Plan review, FCM/NZT alignment and climate-risk considerations.
+${fieldLine('mies-data')}
+${fieldLine('mantle-t1t2')}
+
+Task 2 - Geospatial Energy Analysis and Mapping
+The Opportunity Atlas should integrate growth, building, energy, infrastructure and source-opportunity data into an updateable decision-support framework. MIES supports thermal/electric demand mapping, GHG estimates, demand clusters and carbon-free heat source opportunities. Mantle supports CEERP target context, risk hotspot review and FCM/NZT alignment. GIS/platform ownership remains an HCE-owned risk until confirmed.
+${fieldLine('mies-thermal')}
+
+Task 3 - Clean Energy Solutions Analysis
+Mantle leads the solutions overview, options matrix and scenario analysis. MIES supports thermal suitability, electrification, district energy and source mapping. HCE integrates findings through implementation and municipal-operator lenses.
+${fieldLine('mantle-t3')}
+${fieldLine('mantle-scenarios')}
+
+Task 4 - Stakeholder Engagement Support
+HCE supports Town-led engagement with technical materials, decision logs, feedback capture and implementation-focused discussion. Mantle supports engagement with climate risk, energy strategy and FCM compliance expertise.
+${fieldLine('mantle-t4t5')}
+
+Task 5 - Implementation and Governance Framework
+HCE leads roadmap, governance options, utility coordination and final integration. Mantle supports PESTLE, policy framework, planning tools, barriers/enablers, financing pathways, municipal models, utility partnerships and grant/funding alignment.
+${fieldLine('hce-roadmap')}
+
+Risk, assumption and verification labels
+- RISK: GIS/platform owner and update workflow remain unresolved until confirmed.
+- ASSUMPTION: available utility/building/geospatial datasets will be sufficient for screening-level analysis.
+- VERIFIED: confirmed partners in this workspace are HCE, MIES and Mantle.
+- TO BE CONFIRMED: final data availability, modelling assumptions, Town review points and addenda impacts.`, ['sections.s4','mies-data','mies-thermal','mantle-t1t2','mantle-t3','mantle-scenarios','mantle-t4t5','hce-roadmap','unassignedRisks']),
+    s5: compiledSection('s5', `[COMPILED DRAFT - REVIEW BEFORE UPLOAD]
+
+The work schedule is structured around the five RFP task lines, Town review points, partner dependencies and final reporting cycle. HCE controls schedule management, Town coordination, quality review, partner handoffs and final integration.
+
+Task structure and lead responsibilities
+${taskMatrix.map(r=>`- ${r}`).join('\n') || '- TO BE CONFIRMED: task schedule rows.'}
+
+Task/person responsibility matrix from internal build
+${allocations.length ? allocations.map(r=>`- ${r}`).join('\n') : '- TO BE CONFIRMED: task allocation rows have not been entered. Do not invent person-level effort.'}
+
+Partner schedule responsibilities
+- HCE: kickoff, governance, Town meetings, QA gates, utility coordination, final report integration and implementation roadmap.
+- MIES: data review, modelling assumptions, demand/source modelling, thermal/electric analysis, scenario support and technical review cycles.
+- Mantle: CES solutions/scenario analysis, FCM/NZT alignment, engagement support, PESTLE/policy/governance support and implementation framework inputs.
+
+Dependencies and review gates
+- Data request and completeness check before modelling and mapping.
+- Assumptions register and data confidence review before Opportunity Atlas outputs are finalized.
+- Solutions screening before scenario comparison.
+- Town review of draft findings before implementation-roadmap finalization.
+- Addenda and upload readiness check before final documents are exported.
+
+Addenda and compliance readiness
+${addenda.map(a=>`- ${a.item || 'Addenda item'}: ${a.status || 'TBC'} - ${a.note || ''}`).join('\n') || '- TO BE CONFIRMED: addenda readiness.'}
+
+Schedule caveats
+- TO BE CONFIRMED: final calendar dates, Town review windows, meeting cadence, deliverable due dates and Gantt formatting.
+- Internal effort inputs may guide sequencing, but commercial information is intentionally excluded from this technical section.`, ['sections.s5','portalForms.pricing','pricingBuild.taskAllocations','portalForms.addenda'])
+  };
+}
+function compileSectionsFromWorkspace(){
+  const c = ensureSectionCompiler();
+  c.compiled = buildCompiledSections();
+  c.lastCompiledAt = new Date().toLocaleString();
+  c.status = 'Compiled drafts ready for review';
+  const bodies = sectionKeys().map(k=>c.compiled[k]?.body||'').join('\n\n');
+  c.noFeeCheck = noFeeCheck(bodies);
+  c.warnings = sectionKeys().flatMap(k=>c.compiled[k]?.warnings||[]);
+  saveState();
+  renderSections();
+  renderExport();
+  alert(`Compiled section drafts are ready. No-fee check: ${c.noFeeCheck.passed ? 'passed' : 'review warnings'}.`);
+}
+function compilerStatusHtml(){
+  const c = ensureSectionCompiler();
+  const cls = c.noFeeCheck?.passed ? 'ok' : 'warn';
+  const findings = c.noFeeCheck?.findings || [];
+  return `<div class="callout ${cls}"><strong>Section Compiler:</strong> ${escapeHtml(c.status || 'Not compiled')} ${c.lastCompiledAt ? `at ${escapeHtml(c.lastCompiledAt)}` : ''}<br>${findings.length ? `No-fee findings to review: ${findings.map(escapeHtml).join(', ')}` : 'Compiled draft no-fee check has no findings.'}</div>`;
+}
+function renderSectionCompilerPanel(key){
+  const c = ensureSectionCompiler();
+  const draft = c.compiled[key] || {};
+  const hasDraft = !!String(draft.body||'').trim();
+  const check = draft.noFeeCheck || {passed:true,findings:[]};
+  return `<div class="section-compiler"><h3>Section Compiler</h3><p class="helptext">Compile richer draft sections from partner lanes, portal references, staffing records, task responsibilities and compliance data. Saved section text is preserved until you apply a compiled draft.</p>
+  <div class="toolbar"><button onclick="compileSectionsFromWorkspace()">Compile Sections from Workspace Data</button><button class="secondary" onclick="applyAllCompiledSections()" ${hasAnyCompiledSections()?'':'disabled'}>Apply compiled drafts to all sections</button><button class="secondary" onclick="exportAllSections(true)" ${hasAnyCompiledSections()?'':'disabled'}>Export compiled Section 1-5 documents</button></div>
+  ${compilerStatusHtml()}
+  ${hasDraft ? `<div class="grid two"><div><label>Current saved section body</label><textarea class="big" readonly>${escapeHtml(state.sections[key]?.body || '')}</textarea></div><div><label>Compiled draft preview</label><textarea class="big" readonly>${escapeHtml(draft.body || '')}</textarea></div></div>
+    <div class="callout ${check.passed?'ok':'warn'}"><strong>No-fee check for this compiled draft:</strong> ${check.passed ? 'passed' : check.findings.map(escapeHtml).join(', ')}</div>
+    <div class="grid two"><div><strong>Sources used</strong><ul>${(draft.sourceMap||[]).map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ul></div><div><strong>Warnings / TBCs</strong><ul>${(draft.warnings||[]).length ? draft.warnings.map(w=>`<li>${escapeHtml(w)}</li>`).join('') : '<li>No compiler warnings for this draft.</li>'}</ul></div></div>
+    <div class="toolbar"><button class="green" onclick="applyCompiledSection('${key}')">Apply compiled draft to this section</button><button class="purple" onclick="exportSection('${key}',true)">Export using compiled draft</button><button class="secondary" onclick="exportSection('${key}',false)">Export using saved section body</button></div>` : '<p class="muted">No compiled draft yet. Click Compile Sections from Workspace Data to generate review drafts.</p>'}
+  </div>`;
+}
+function hasAnyCompiledSections(){ const c=ensureSectionCompiler(); return sectionKeys().some(k=>String(c.compiled[k]?.body||'').trim()); }
+function applyCompiledSection(key){
+  const draft = ensureSectionCompiler().compiled[key];
+  if(!draft?.body){ alert('Compile drafts first.'); return; }
+  if(!confirm(`Apply the compiled draft to ${state.sections[key]?.title || key}? This replaces only this saved section body.`)) return;
+  state.sections[key].body = draft.body;
+  state.sections[key].source = 'Compiled from workspace data; reviewed/applied by coordinator';
+  saveState();
+  renderSections();
+}
+function applyAllCompiledSections(){
+  const c = ensureSectionCompiler();
+  if(!hasAnyCompiledSections()){ alert('Compile drafts first.'); return; }
+  if(!confirm('Apply compiled drafts to all five saved section bodies? This does not change partner lanes, pricing, imports or portal forms.')) return;
+  sectionKeys().forEach(k => { if(c.compiled[k]?.body && state.sections[k]){ state.sections[k].body = c.compiled[k].body; state.sections[k].source = 'Compiled from workspace data; reviewed/applied by coordinator'; } });
+  saveState();
+  renderSections();
+}
 function updateCounters(){ Object.entries(state.sections).forEach(([k,s]) => { const el=document.getElementById('count-'+k); if(el) el.textContent = `${wordCount(s.body)} words · ${String(s.body||'').length} characters`; }); }
 function wordCount(t){ return (String(t||'').trim().match(/\S+/g)||[]).length; }
 function renderPartners(){
@@ -1568,7 +1881,8 @@ function scanAll(){
 }
 function runQA(){ renderQA(); alert('QA checks refreshed.'); }
 function renderExport(){
-  document.getElementById('export').innerHTML = `<div class="panel"><h2>Compile & Export</h2><p class="helptext">Exports are for internal drafting and final proposal QA. Town-facing exports remove most internal instructions and should still be reviewed before upload.</p><label><input type="checkbox" id="includeInternalMarkers"> Include internal markers/action notes in section exports</label><div class="toolbar"><button onclick="exportAllSections()">Export clean Section 1–5 documents</button><button onclick="exportPartner('hce')">Export all HCE inputs</button><button onclick="exportPartner('mies')">Export all MIES inputs</button><button onclick="exportPartner('mantle')">Export all Mantle inputs</button><button onclick="exportPartner(state.selectedRole)">Export selected partner input pack</button><button onclick="exportInternalMaster()">Export stitched internal master</button><button onclick="exportPortalSummary()">Export portal field summary</button><button onclick="exportQA()">Export QA report</button><button onclick="exportJson()">Export JSON backup</button></div><div class="callout warn">Before final upload: render PDFs, run accessibility checks, run addenda/deadline check, run portal dry-run, and confirm no pricing appears in Sections 1–5.</div></div>${submissionPanel('export')}`;
+  const compiledReady = hasAnyCompiledSections();
+  document.getElementById('export').innerHTML = `<div class="panel"><h2>Compile & Export</h2><p class="helptext">Exports are for internal drafting and final proposal QA. Town-facing exports remove most internal instructions and should still be reviewed before upload.</p>${compilerStatusHtml()}<label><input type="checkbox" id="includeInternalMarkers"> Include internal markers/action notes in section exports</label><div class="toolbar"><button onclick="exportAllSections(false)">Export clean Section 1–5 documents</button><button onclick="exportAllSections(true)" ${compiledReady?'':'disabled'}>Export compiled Section 1–5 documents</button><button onclick="exportPartner('hce')">Export all HCE inputs</button><button onclick="exportPartner('mies')">Export all MIES inputs</button><button onclick="exportPartner('mantle')">Export all Mantle inputs</button><button onclick="exportPartner(state.selectedRole)">Export selected partner input pack</button><button onclick="exportInternalMaster()">Export stitched internal master</button><button onclick="exportPortalSummary()">Export portal field summary</button><button onclick="exportQA()">Export QA report</button><button onclick="exportJson()">Export JSON backup</button></div><div class="callout warn">Before final upload: render PDFs, run accessibility checks, run addenda/deadline check, run portal dry-run, and confirm no pricing appears in Sections 1–5.</div></div>${submissionPanel('export')}`;
 }
 function cleanInternalTags(t){
   if(document.getElementById('includeInternalMarkers')?.checked) return t;
@@ -1581,9 +1895,30 @@ function cleanInternalTags(t){
 function sectionHtml(s){
   return `<h1>${escapeHtml(s.title)}</h1><h2>Purpose of this section</h2><p>${escapeHtml(s.purpose)}</p><h2>Key evidence provided</h2><p>${escapeHtml(s.evidence)}</p><h2>Primary team responsibilities</h2><p>${escapeHtml(s.responsibilities)}</p><h2>How this supports the Town’s CES Study</h2><p>${escapeHtml(s.support)}</p><h2>Response</h2>${paragraphs(cleanInternalTags(s.body))}`;
 }
-function paragraphs(t){ return String(t||'').split(/\n(2,)/).map(p=>`<p>${escapeHtml(p).replace(/\n/g,'<br>')}</p>`).join(''); }
-function exportSection(k){ const s=state.sections[k]; download(`${s.filename}.doc`, wordHtml(s.title, sectionHtml(s)), 'application/msword'); }
-function exportAllSections(){ Object.keys(state.sections).forEach(k=>exportSection(k)); }
+function paragraphs(t){ return String(t||'').split(/\n{2,}/).map(p=>`<p>${escapeHtml(p).replace(/\n/g,'<br>')}</p>`).join(''); }
+function sectionForExport(k,useCompiled=false){
+  const s = structuredCloneSafe(state.sections[k]);
+  if(useCompiled){
+    const draft = ensureSectionCompiler().compiled[k];
+    if(draft?.body) s.body = draft.body;
+    ['purpose','evidence','responsibilities','support'].forEach(field => { s[field] = sanitizeTechnicalText(s[field]); });
+  }
+  return s;
+}
+function confirmNoFeeExport(k,useCompiled=false){
+  if(!useCompiled) return true;
+  const s = sectionForExport(k,useCompiled);
+  const check = noFeeCheck(`${s.title}\n${s.purpose}\n${s.evidence}\n${s.responsibilities}\n${s.support}\n${s.body}`);
+  if(check.passed) return true;
+  return confirm(`${s.title} has no-fee findings: ${check.findings.join(', ')}.\n\nExport anyway for review?`);
+}
+function exportSection(k,useCompiled=false){
+  if(!confirmNoFeeExport(k,useCompiled)) return;
+  const s=sectionForExport(k,useCompiled);
+  const suffix = useCompiled ? '_COMPILED_DRAFT' : '';
+  download(`${s.filename}${suffix}.doc`, wordHtml(s.title, sectionHtml(s)), 'application/msword');
+}
+function exportAllSections(useCompiled=false){ Object.keys(state.sections).forEach(k=>exportSection(k,useCompiled)); }
 function partnerPackHtml(role){ const fields=state.partnerFields.filter(f=>role==='all'||ownerMatches(f.owners,role)); return `<h1>${escapeHtml(state.roles[role]?.label || 'Selected Partner')} Input Pack</h1>${fields.map(f=>`<h2>${escapeHtml(f.label)}</h2><p><strong>Owners:</strong> ${escapeHtml((f.owners||[]).join(', '))}<br><strong>Status:</strong> ${escapeHtml(f.status)}<br><strong>Source:</strong> ${escapeHtml(f.source)}</p>${paragraphs(f.text)}`).join('')}`; }
 function exportPartner(role){ if(role==='all') role='all'; download(`Caledon_CES_RFP_${role}_Input_Pack.doc`, wordHtml('Partner Input Pack', partnerPackHtml(role)), 'application/msword'); }
 function allSectionsHtml(){ return `<div class="cover"><h1>Caledon CES RFP — Internal Stitched Master</h1><p>Internal workspace export. Not for Town submission unless cleaned and QA-approved.</p></div>${Object.values(state.sections).map(sectionHtml).join('<hr>')}`; }
