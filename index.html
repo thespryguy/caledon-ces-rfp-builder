@@ -59,6 +59,8 @@ textarea{min-height:92px;resize:vertical} textarea.big{min-height:340px} textare
 .pricing-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:12px 0}
 .pricing-summary .kpi{min-height:94px}
 .pricing-build-table td input,.pricing-build-table td select,.pricing-build-table td textarea{min-width:120px}
+.sort-header{background:transparent;color:inherit;border:0;padding:0;font:inherit;font-weight:800;cursor:pointer;text-align:left}
+.sort-header.active{color:var(--hce)}
 .readonly-cell{color:var(--muted);font-size:.9rem;min-width:170px}
 .meta{display:flex;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:.82rem;margin:6px 0}
 table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden} th,td{border:1px solid var(--line);padding:8px;vertical-align:top;text-align:left} th{background:#f0f4f8;font-size:.82rem} td input,td textarea,td select{min-width:130px}
@@ -829,6 +831,10 @@ const DEFAULT_DATA = {
   },
   "pricingBuild": {
     "taskAllocations": [],
+    "sort": {
+      "field": "taskLine",
+      "direction": "asc"
+    },
     "overrides": {
       "A.1": {
         "enabled": false,
@@ -1876,6 +1882,9 @@ function ensurePricingBuild(){
   const build = state.pricingBuild || (state.pricingBuild = d);
   if(!Array.isArray(build.taskAllocations)) build.taskAllocations = [];
   if(!build.overrides || typeof build.overrides !== 'object') build.overrides = {};
+  if(!build.sort || typeof build.sort !== 'object') build.sort = structuredCloneSafe(d.sort || {field:'taskLine',direction:'asc'});
+  if(!build.sort.field) build.sort.field = 'taskLine';
+  if(!['asc','desc'].includes(build.sort.direction)) build.sort.direction = 'asc';
   (state.portalForms.pricing||[]).forEach(t => {
     const line = t.line;
     if(line && !build.overrides[line]) build.overrides[line] = structuredCloneSafe(d.overrides[line] || {enabled:false,manualPrice:'',reason:''});
@@ -1957,9 +1966,41 @@ function renderTaskHoursBuild(){
   return `<h3>Task Hours / Price Build</h3><div class="callout"><strong>Non-destructive calculator:</strong> calculated prices are shown here only and do not overwrite Price Schedule A portal values.</div><div class="toolbar"><button class="small" onclick="addPricingAllocation()">Add Allocation Row</button></div>${renderAllocationTable()}${renderTaskRollup()}${renderWorkshareSummary()}`;
 }
 function renderAllocationTable(){
-  const rows = ensurePricingBuild().taskAllocations;
+  const rows = sortedPricingAllocations();
   if(!rows.length) return '<p class="muted">No allocation rows yet. Add a row to build task prices from team member rates and proposed hours.</p>';
-  return `<div class="table-wrap"><table class="pricing-build-table"><thead><tr><th>Task line</th><th>Task name</th><th>Partner</th><th>Team member</th><th>Role</th><th>Rate</th><th>Hours</th><th>Line total</th><th>Status</th><th>Notes</th><th></th></tr></thead><tbody>${rows.map(renderAllocationRow).join('')}</tbody></table></div>`;
+  return `<div class="table-wrap"><table class="pricing-build-table"><thead><tr>${pricingSortTh('Task line','taskLine')}${pricingSortTh('Task name','taskName')}${pricingSortTh('Partner','partner')}${pricingSortTh('Team member','teamMemberName')}${pricingSortTh('Role','role')}${pricingSortTh('Rate','rate')}${pricingSortTh('Hours','hours')}${pricingSortTh('Line total','lineTotal')}${pricingSortTh('Status','status')}<th>Notes</th><th></th></tr></thead><tbody>${rows.map(renderAllocationRow).join('')}</tbody></table></div>`;
+}
+function pricingSortTh(label,field){
+  const sort = ensurePricingBuild().sort || {};
+  const active = sort.field === field;
+  const arrow = active ? (sort.direction === 'asc' ? ' ▲' : ' ▼') : '';
+  return `<th><button class="sort-header ${active?'active':''}" onclick="setPricingSort('${field}')" title="Sort by ${escapeHtml(label)}">${escapeHtml(label)}${arrow}</button></th>`;
+}
+function setPricingSort(field){
+  const build = ensurePricingBuild();
+  if(build.sort.field === field) build.sort.direction = build.sort.direction === 'asc' ? 'desc' : 'asc';
+  else build.sort = {field, direction:'asc'};
+  saveState();
+  renderPricing();
+}
+function sortedPricingAllocations(){
+  const build = ensurePricingBuild();
+  const rows = [...build.taskAllocations];
+  const sort = build.sort || {field:'taskLine',direction:'asc'};
+  rows.sort((a,b) => comparePricingAllocation(a,b,sort.field) * (sort.direction === 'desc' ? -1 : 1));
+  return rows;
+}
+function comparePricingAllocation(a,b,field){
+  const av = pricingSortValue(a,field);
+  const bv = pricingSortValue(b,field);
+  if(typeof av === 'number' && typeof bv === 'number') return av - bv;
+  return String(av ?? '').localeCompare(String(bv ?? ''), undefined, {numeric:true,sensitivity:'base'});
+}
+function pricingSortValue(a,field){
+  if(field === 'taskName') return taskByLine(a.taskLine).task || '';
+  if(field === 'lineTotal') return pricingAllocationTotal(a);
+  if(field === 'rate' || field === 'hours') return numericMoney(a[field]);
+  return a[field] || '';
 }
 function renderAllocationRow(a,index){
   const task = taskByLine(a.taskLine);
